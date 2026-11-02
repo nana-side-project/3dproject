@@ -1,0 +1,600 @@
+{"BR":"none","HOURS":720,"SEED":"1","errors":0}
+FIRSTS {"sighting":0.1,"clay-pit":1.3,"rakko-bed":28.3,"hut":31.5,"raft":32.1,"south-load":32.3,"crossing:sopunu":32.3,"dry-wood":105.3,"fired-pot":107.1,"cook-pot":107.2,"oil":107.2,"pier":124.3,"lamp-dish":227.1,"light":257.6,"retort":299.2,"weather-pot":473.9} labDoneLast ["449.6h p40x_oil_lamp","472.8h p12y_pot_dry","473.4h p13y_pot_pit_fire","473.6h p40x_oil_lamp","473.9h p16x_vessel_tar_seal","497.5h p40x_oil_lamp","521.9h p40x_oil_lamp","543.1h p31x_coconut_oil_boil","543.4h p30x_coconut_milk","545.6h p40x_oil_lamp","569.5h p40x_oil_lamp","593.5h p40x_oil_lamp"]
+END {"labReady":[],"labRuns":["m02x_air_barometer_test","m03x_air_barometer_pot"],"dot":{"task":"look","holding":"","diary":["種をまく：できた","浜から海を眺める（流木が打ち上がるのを待つ）","浜から海を眺める（流木が打ち上がるのを待つ）：できた","近くを歩いてまわりを見る","近くを歩いてまわりを見る：できた","浜から海を眺める（流木が打ち上がるのを待つ）"]},"lantern":{"task":"explore","holding":"","diary":["天気の壺を置いて読む（竹の管の水の高さ）：壺に空気が入ったまま。管の水が、置いたときの印と合わない","試験用の気圧計を置いて読む：目盛り -1（蒸し暑い朝）","天気の壺を置いて読む（竹の管の水の高さ）：壺に空気が入ったまま。管の水が、置いたときの印と合わない","ラッコと情報を交換した。","試験用の気圧計を置いて読む：目盛り -1（蒸し暑い朝）","天気の壺を置いて読む（竹の管の水の高さ）：壺に空気が入ったまま。管の水が、置いたときの印と合わない"]},"raft":{"parts":6,"x":64.70243659879763,"z":-84.75959931589756,"hauled":false,"quick":false},"treasures":37,"lots":[["fired_pot",1.02,0,3000,""],["fired_pot",0.08,0,100,""],["fired_pot",0.46,0,500,""],["firewood",9.49,271008.95233282534,null,""]]}
+STORMS [{"at":39.8,"warned":true,"saved":["おなか（前もって食べておいた）"],"lost":["筏の部材3本","畑の作物（6区画）","おなか（台風のあいだ食べられず、弱った）"]}] swell {"alarm":0,"hits":1,"falses":5}
+K 0.0h LN lab/- DOT look/- kameHunger 0.40
+L 0.0h wood green 0 seasoned 0 clay 25 pots g/d/f 0/0/0 equip  felled 0 fuel 0
+K 2.0h LN rest/- DOT look/- kameHunger 0.14
+K 4.0h LN sleep/- DOT wander/- kameHunger 0.34
+K 6.0h LN sleep/- DOT look/- kameHunger 0.19
+L 6.0h wood green 0 seasoned 0 clay 4.9 pots g/d/f 0/0/0 equip  felled 0 fuel 0
+K 8.0h LN sleep/- DOT look/- kameHunger 0.21
+K 10.0h LN sleep/- DOT look/- kameHunger 0.36
+K 12.0h LN rest/- DOT wander/- kameHunger 0.06
+L 12.0h wood green 0 seasoned 0 clay 4.9 pots g/d/f 0/0/0 equip  felled 0 fuel 0
+K 14.0h LN fire/- DOT fire/- kameHunger 0.25
+K 16.0h LN lab/- DOT sleep/wood kameHunger 0.40
+K 18.0h LN explore/- DOT sleep/wood kameHunger 0.47
+L 18.0h wood green 0 seasoned 0 clay 4.9 pots g/d/f 0/0/0 equip  felled 0 fuel 0
+K 20.0h LN explore/- DOT sleep/wood kameHunger 0.54
+K 22.0h LN think/- DOT sleep/wood kameHunger 0.63
+K 24.0h LN explore/- DOT wander/- kameHunger 0.74
+L 24.0h wood green 0 seasoned 0 clay 4.9 pots g/d/f 0/0/0 equip  felled 0 fuel 0
+K 26.0h LN rest/- DOT look/- kameHunger 0.39
+K 28.0h LN sleep/- DOT look/- kameHunger 0.65
+K 30.0h LN sleep/- DOT look/- kameHunger 0.25
+L 30.0h wood green 0 seasoned 0 clay 4.9 pots g/d/f 0/0/0 equip  felled 0 fuel 0
+K 32.0h LN sleep/- DOT gather/- kameHunger 0.44
+K 34.0h LN sleep/- DOT look/- kameHunger 0.16
+K 36.0h LN rest/- DOT shelter/- kameHunger 0.14
+L 36.0h wood green 13 seasoned 0 clay 14.9 pots g/d/f 0/0/0 equip  felled 0 fuel 0
+K 38.0h LN shelter/- DOT shelter/- kameHunger 0.26
+K 40.0h LN shelter/- DOT shelter/- kameHunger 0.37
+K 42.0h LN think/- DOT sleep/- kameHunger 0.45
+L 42.0h wood green 13 seasoned 0 clay 14.9 pots g/d/f 0/0/0 equip  felled 0 fuel 0
+K 44.0h LN explore/- DOT sleep/- kameHunger 0.52
+K 46.0h LN lab/- DOT sleep/- kameHunger 0.60
+K 48.0h LN lab/- DOT gather/- kameHunger 0.68
+L 48.0h wood green 13 seasoned 0 clay 12.6 pots g/d/f 1/0/0 equip  felled 0 fuel 0
+K 50.0h LN tool/- DOT wander/- kameHunger 0.08
+K 52.0h LN sleep/- DOT look/- kameHunger 0.28
+K 54.0h LN sleep/- DOT look/- kameHunger 0.35
+L 54.0h wood green 51 seasoned 0 clay 11.1 pots g/d/f 2/0/0 equip firewood_stack felled 4 fuel 4
+K 56.0h LN sleep/- DOT look/- kameHunger 0.19
+K 58.0h LN sleep/- DOT wander/- kameHunger 0.38
+K 60.0h LN rest/- DOT wander/- kameHunger 0.12
+L 60.0h wood green 51 seasoned 0 clay 11.1 pots g/d/f 2/0/0 equip firewood_stack felled 4 fuel 4
+K 62.0h LN fire/- DOT fire/- kameHunger 0.30
+K 64.0h LN explore/- DOT sleep/- kameHunger 0.44
+K 66.0h LN think/- DOT sleep/- kameHunger 0.51
+L 66.0h wood green 51 seasoned 0 clay 9 pots g/d/f 2/0/0 equip firewood_stack felled 4 fuel 4
+K 68.0h LN think/- DOT sleep/- kameHunger 0.58
+K 70.0h LN think/- DOT sleep/- kameHunger 0.65
+K 72.0h LN explore/- DOT shelter/- kameHunger 0.73
+L 72.0h wood green 51 seasoned 0 clay 9 pots g/d/f 2/0/0 equip firewood_stack felled 4 fuel 4
+K 74.0h LN rest/- DOT look/- kameHunger 0.11
+K 76.0h LN sleep/- DOT look/- kameHunger 0.32
+K 78.0h LN sleep/- DOT look/- kameHunger 0.06
+L 78.0h wood green 51 seasoned 0 clay 9 pots g/d/f 0/2/0 equip firewood_stack felled 4 fuel 4
+K 80.0h LN sleep/- DOT look/- kameHunger 0.26
+K 82.0h LN sleep/- DOT look/- kameHunger 0.44
+K 84.0h LN rest/- DOT look/- kameHunger 0.18
+L 84.0h wood green 51 seasoned 0 clay 9 pots g/d/f 0/2/0 equip firewood_stack felled 4 fuel 4
+K 86.0h LN fire/- DOT fire/- kameHunger 0.36
+K 88.0h LN think/- DOT sleep/- kameHunger 0.14
+K 90.0h LN explore/- DOT sleep/- kameHunger 0.12
+L 90.0h wood green 51 seasoned 0 clay 9 pots g/d/f 0/2/0 equip firewood_stack felled 4 fuel 4
+K 92.0h LN explore/- DOT sleep/- kameHunger 0.19
+K 94.0h LN explore/- DOT sleep/- kameHunger 0.27
+K 96.0h LN think/- DOT shelter/- kameHunger 0.36
+L 96.0h wood green 51 seasoned 0 clay 9 pots g/d/f 0/2/0 equip firewood_stack felled 4 fuel 4
+K 98.0h LN rest/- DOT look/- kameHunger 0.11
+K 100.0h LN sleep/- DOT look/- kameHunger 0.34
+K 102.0h LN sleep/- DOT look/- kameHunger 0.08
+L 102.0h wood green 51 seasoned 0 clay 9 pots g/d/f 0/2/0 equip firewood_stack felled 4 fuel 4
+K 104.0h LN sleep/- DOT look/- kameHunger 0.25
+K 106.0h LN sleep/- DOT look/- kameHunger 0.42
+K 108.0h LN rest/- DOT fell/- kameHunger 0.12
+L 108.0h wood green 0 seasoned 7.5 clay 8.9 pots g/d/f 1/0/1 equip firewood_stack,open_fire_pit,cook_pot felled 4 fuel 4
+K 110.0h LN fire/- DOT fire/- kameHunger 0.30
+K 112.0h LN think/- DOT sleep/- kameHunger 0.05
+K 114.0h LN think/- DOT sleep/- kameHunger 0.12
+L 114.0h wood green 52.3 seasoned 7.5 clay 8.9 pots g/d/f 1/0/1 equip firewood_stack,open_fire_pit,cook_pot felled 10 fuel 10
+K 116.0h LN think/- DOT sleep/- kameHunger 0.19
+K 118.0h LN think/- DOT sleep/- kameHunger 0.26
+K 120.0h LN think/- DOT look/- kameHunger 0.35
+L 120.0h wood green 52.3 seasoned 7.5 clay 8.9 pots g/d/f 1/0/1 equip firewood_stack,open_fire_pit,cook_pot felled 10 fuel 10
+K 122.0h LN rest/- DOT deck/plank kameHunger 0.09
+K 124.0h LN sleep/- DOT deck/plank kameHunger 0.28
+K 126.0h LN sleep/- DOT wander/- kameHunger 0.48
+L 126.0h wood green 52.3 seasoned 7.5 clay 8.9 pots g/d/f 1/0/1 equip firewood_stack,open_fire_pit,cook_pot felled 10 fuel 10
+K 128.0h LN sleep/- DOT wander/- kameHunger 0.15
+K 130.0h LN sleep/- DOT plant/- kameHunger 0.35
+K 132.0h LN rest/- DOT wander/- kameHunger 0.08
+L 132.0h wood green 52.3 seasoned 7.5 clay 8.9 pots g/d/f 1/0/1 equip firewood_stack,open_fire_pit,cook_pot felled 10 fuel 10
+K 134.0h LN fire/- DOT fire/- kameHunger 0.27
+K 136.0h LN explore/- DOT sleep/- kameHunger 0.42
+K 138.0h LN explore/- DOT sleep/- kameHunger 0.49
+L 138.0h wood green 52.3 seasoned 7.5 clay 8.9 pots g/d/f 0/1/1 equip firewood_stack,open_fire_pit,cook_pot felled 10 fuel 10
+K 140.0h LN think/- DOT sleep/- kameHunger 0.56
+K 142.0h LN think/- DOT sleep/- kameHunger 0.63
+K 144.0h LN explore/- DOT wander/- kameHunger 0.71
+L 144.0h wood green 52.3 seasoned 7.5 clay 8.9 pots g/d/f 0/1/1 equip firewood_stack,open_fire_pit,cook_pot felled 10 fuel 10
+K 146.0h LN rest/- DOT wander/- kameHunger 0.10
+K 148.0h LN sleep/- DOT look/- kameHunger 0.31
+K 150.0h LN sleep/- DOT wander/- kameHunger 0.07
+L 150.0h wood green 52.3 seasoned 7.5 clay 8.9 pots g/d/f 0/1/1 equip firewood_stack,open_fire_pit,cook_pot felled 10 fuel 10
+K 152.0h LN sleep/- DOT look/- kameHunger 0.31
+K 154.0h LN sleep/- DOT idle/- kameHunger 0.59
+K 156.0h LN rest/- DOT look/- kameHunger 0.24
+L 156.0h wood green 52.3 seasoned 7.5 clay 8.9 pots g/d/f 0/1/1 equip firewood_stack,open_fire_pit,cook_pot felled 10 fuel 10
+K 158.0h LN fire/- DOT fire/- kameHunger 0.42
+K 160.0h LN explore/- DOT sleep/- kameHunger 0.17
+K 162.0h LN explore/- DOT sleep/- kameHunger 0.12
+L 162.0h wood green 52.3 seasoned 7.5 clay 8.9 pots g/d/f 0/1/1 equip firewood_stack,open_fire_pit,cook_pot felled 10 fuel 10
+K 164.0h LN stackwood/- DOT sleep/- kameHunger 0.19
+K 166.0h LN explore/- DOT sleep/- kameHunger 0.26
+K 168.0h LN explore/- DOT shelve/drift kameHunger 0.34
+L 168.0h wood green 0 seasoned 16.5 clay 8.8 pots g/d/f 1/0/2 equip firewood_stack,open_fire_pit,cook_pot felled 10 fuel 10
+K 170.0h LN rest/- DOT look/- kameHunger 0.08
+K 172.0h LN sleep/- DOT wander/- kameHunger 0.07
+K 174.0h LN sleep/- DOT look/- kameHunger 0.18
+L 174.0h wood green 51.2 seasoned 16.5 clay 8.8 pots g/d/f 1/0/2 equip firewood_stack,open_fire_pit,cook_pot felled 16 fuel 16
+K 176.0h LN sleep/- DOT look/- kameHunger 0.24
+K 178.0h LN sleep/- DOT wander/- kameHunger 0.43
+K 180.0h LN rest/- DOT look/- kameHunger 0.16
+L 180.0h wood green 51.2 seasoned 16.5 clay 8.8 pots g/d/f 1/0/2 equip firewood_stack,open_fire_pit,cook_pot felled 16 fuel 16
+K 182.0h LN fire/- DOT fire/- kameHunger 0.36
+K 184.0h LN think/- DOT sleep/- kameHunger 0.15
+K 186.0h LN explore/- DOT sleep/- kameHunger 0.12
+L 186.0h wood green 51.2 seasoned 16.5 clay 8.8 pots g/d/f 1/0/2 equip firewood_stack,open_fire_pit,cook_pot felled 16 fuel 16
+K 188.0h LN explore/- DOT sleep/- kameHunger 0.19
+K 190.0h LN think/- DOT sleep/- kameHunger 0.26
+K 192.0h LN think/- DOT look/- kameHunger 0.35
+L 192.0h wood green 51.2 seasoned 16.5 clay 8.8 pots g/d/f 0/1/2 equip firewood_stack,open_fire_pit,cook_pot felled 16 fuel 16
+K 194.0h LN rest/- DOT wander/- kameHunger 0.08
+K 196.0h LN sleep/- DOT look/- kameHunger 0.30
+K 198.0h LN sleep/- DOT wander/- kameHunger 0.27
+L 198.0h wood green 51.2 seasoned 16.5 clay 8.8 pots g/d/f 0/1/2 equip firewood_stack,open_fire_pit,cook_pot felled 16 fuel 16
+K 200.0h LN sleep/- DOT look/- kameHunger 0.23
+K 202.0h LN sleep/- DOT look/- kameHunger 0.42
+K 204.0h LN rest/- DOT look/- kameHunger 0.14
+L 204.0h wood green 51.2 seasoned 16.5 clay 8.8 pots g/d/f 0/1/2 equip firewood_stack,open_fire_pit,cook_pot felled 16 fuel 16
+K 206.0h LN fire/- DOT fire/- kameHunger 0.34
+K 208.0h LN explore/- DOT sleep/- kameHunger 0.29
+K 210.0h LN think/- DOT sleep/- kameHunger 0.37
+L 210.0h wood green 51.2 seasoned 16.5 clay 8.8 pots g/d/f 0/1/2 equip firewood_stack,open_fire_pit,cook_pot felled 16 fuel 16
+K 212.0h LN think/- DOT sleep/- kameHunger 0.44
+K 214.0h LN think/- DOT sleep/- kameHunger 0.51
+K 216.0h LN explore/- DOT shelve/drift kameHunger 0.59
+L 216.0h wood green 51.2 seasoned 16.5 clay 8.8 pots g/d/f 0/1/2 equip firewood_stack,open_fire_pit,cook_pot felled 16 fuel 16
+K 218.0h LN rest/- DOT look/- kameHunger 0.10
+K 220.0h LN sleep/- DOT look/- kameHunger 0.30
+K 222.0h LN sleep/- DOT look/- kameHunger 0.24
+L 222.0h wood green 51.2 seasoned 16.5 clay 8.8 pots g/d/f 0/1/2 equip firewood_stack,open_fire_pit,cook_pot felled 16 fuel 16
+K 224.0h LN sleep/- DOT look/- kameHunger 0.22
+K 226.0h LN sleep/- DOT look/- kameHunger 0.42
+K 228.0h LN lab/- DOT look/- kameHunger 0.12
+L 228.0h wood green 0 seasoned 24.1 clay 8.8 pots g/d/f 0/0/2 equip firewood_stack,open_fire_pit,cook_pot,lamp_dish felled 16 fuel 16
+K 230.0h LN fire/- DOT fire/- kameHunger 0.31
+K 232.0h LN lab/- DOT sleep/- kameHunger 0.07
+K 234.0h LN think/- DOT sleep/- kameHunger 0.12
+L 234.0h wood green 0 seasoned 24.1 clay 6.8 pots g/d/f 2/0/2 equip firewood_stack,open_fire_pit,cook_pot,lamp_dish felled 16 fuel 16
+K 236.0h LN think/- DOT sleep/- kameHunger 0.20
+K 238.0h LN explore/- DOT sleep/- kameHunger 0.27
+K 240.0h LN explore/- DOT fell/- kameHunger 0.35
+L 240.0h wood green 25.4 seasoned 24.1 clay 6.8 pots g/d/f 2/0/2 equip firewood_stack,open_fire_pit,cook_pot,lamp_dish felled 19 fuel 19
+K 242.0h LN rest/- DOT wander/- kameHunger 0.08
+K 244.0h LN sleep/- DOT wander/- kameHunger 0.28
+K 246.0h LN sleep/- DOT look/- kameHunger 0.47
+L 246.0h wood green 53.3 seasoned 24.1 clay 6.8 pots g/d/f 2/0/2 equip firewood_stack,open_fire_pit,cook_pot,lamp_dish felled 22 fuel 22
+K 248.0h LN sleep/- DOT look/- kameHunger 0.17
+K 250.0h LN sleep/- DOT look/- kameHunger 0.36
+K 252.0h LN rest/- DOT harvest/- kameHunger 0.11
+L 252.0h wood green 53.3 seasoned 24.1 clay 6.8 pots g/d/f 2/0/2 equip firewood_stack,open_fire_pit,cook_pot,lamp_dish felled 22 fuel 22
+K 254.0h LN fire/- DOT fire/- kameHunger 0.29
+K 256.0h LN explore/- DOT sleep/- kameHunger 0.45
+K 258.0h LN think/- DOT sleep/- kameHunger 0.52
+L 258.0h wood green 53.3 seasoned 23.8 clay 6.8 pots g/d/f 2/0/2 equip firewood_stack,open_fire_pit,cook_pot,lamp_dish felled 22 fuel 22
+K 260.0h LN explore/- DOT sleep/- kameHunger 0.59
+K 262.0h LN explore/- DOT sleep/- kameHunger 0.66
+K 264.0h LN think/- DOT shelve/drift kameHunger 0.75
+L 264.0h wood green 53.3 seasoned 23.8 clay 6.8 pots g/d/f 0/2/2 equip firewood_stack,open_fire_pit,cook_pot,lamp_dish felled 22 fuel 22
+K 266.0h LN rest/- DOT shelter/- kameHunger 0.18
+K 268.0h LN shelter/- DOT wander/- kameHunger 0.40
+K 270.0h LN sleep/- DOT look/- kameHunger 0.13
+L 270.0h wood green 53.3 seasoned 23.8 clay 6.8 pots g/d/f 0/2/2 equip firewood_stack,open_fire_pit,cook_pot,lamp_dish felled 22 fuel 22
+K 272.0h LN sleep/- DOT look/- kameHunger 0.33
+K 274.0h LN sleep/- DOT wander/- kameHunger 0.21
+K 276.0h LN rest/- DOT look/- kameHunger 0.22
+L 276.0h wood green 53.3 seasoned 23.8 clay 6.8 pots g/d/f 0/2/2 equip firewood_stack,open_fire_pit,cook_pot,lamp_dish felled 22 fuel 22
+K 278.0h LN fire/- DOT fire/- kameHunger 0.40
+K 280.0h LN explore/- DOT sleep/- kameHunger 0.53
+K 282.0h LN think/- DOT sleep/- kameHunger 0.60
+L 282.0h wood green 53.3 seasoned 23.8 clay 6.8 pots g/d/f 0/2/2 equip firewood_stack,open_fire_pit,cook_pot,lamp_dish felled 22 fuel 22
+K 284.0h LN explore/- DOT sleep/- kameHunger 0.67
+K 286.0h LN explore/- DOT sleep/- kameHunger 0.74
+K 288.0h LN explore/- DOT look/- kameHunger 0.82
+L 288.0h wood green 53.3 seasoned 23.8 clay 6.8 pots g/d/f 0/2/2 equip firewood_stack,open_fire_pit,cook_pot,lamp_dish felled 22 fuel 22
+K 290.0h LN rest/- DOT look/- kameHunger 0.42
+K 292.0h LN sleep/- DOT look/- kameHunger 0.31
+K 294.0h LN sleep/- DOT look/- kameHunger 0.21
+L 294.0h wood green 53.3 seasoned 23.8 clay 6.8 pots g/d/f 0/2/2 equip firewood_stack,open_fire_pit,cook_pot,lamp_dish felled 22 fuel 22
+K 296.0h LN sleep/- DOT look/- kameHunger 0.24
+K 298.0h LN sleep/- DOT look/- kameHunger 0.43
+K 300.0h LN lab/- DOT wander/- kameHunger 0.14
+L 300.0h wood green 0 seasoned 26.7 clay 6.8 pots g/d/f 0/0/2 equip firewood_stack,open_fire_pit,cook_pot,lamp_dish,tar_retort felled 22 fuel 22
+K 302.0h LN fire/- DOT fire/- kameHunger 0.33
+K 304.0h LN think/- DOT sleep/- kameHunger 0.09
+K 306.0h LN explore/- DOT sleep/- kameHunger 0.12
+L 306.0h wood green 45.3 seasoned 26.7 clay 6.1 pots g/d/f 1/0/2 equip firewood_stack,open_fire_pit,cook_pot,lamp_dish,tar_retort felled 27 fuel 27
+K 308.0h LN explore/- DOT sleep/- kameHunger 0.19
+K 310.0h LN explore/- DOT sleep/- kameHunger 0.27
+K 312.0h LN think/- DOT look/- kameHunger 0.35
+L 312.0h wood green 45.3 seasoned 26.7 clay 6.1 pots g/d/f 1/0/2 equip firewood_stack,open_fire_pit,cook_pot,lamp_dish,tar_retort felled 27 fuel 27
+K 314.0h LN rest/- DOT look/- kameHunger 0.07
+K 316.0h LN sleep/- DOT wander/- kameHunger 0.26
+K 318.0h LN sleep/- DOT look/- kameHunger 0.46
+L 318.0h wood green 45.3 seasoned 26.7 clay 6.1 pots g/d/f 1/0/2 equip firewood_stack,open_fire_pit,cook_pot,lamp_dish,tar_retort felled 27 fuel 27
+K 320.0h LN sleep/- DOT look/- kameHunger 0.19
+K 322.0h LN sleep/- DOT wander/- kameHunger 0.38
+K 324.0h LN rest/- DOT wander/- kameHunger 0.12
+L 324.0h wood green 45.3 seasoned 26.7 clay 6.1 pots g/d/f 1/0/2 equip firewood_stack,open_fire_pit,cook_pot,lamp_dish,tar_retort felled 27 fuel 27
+K 326.0h LN fire/- DOT fire/- kameHunger 0.31
+K 328.0h LN think/- DOT sleep/- kameHunger 0.44
+K 330.0h LN think/- DOT sleep/- kameHunger 0.52
+L 330.0h wood green 45.3 seasoned 26.7 clay 6.1 pots g/d/f 1/0/2 equip firewood_stack,open_fire_pit,cook_pot,lamp_dish,tar_retort felled 27 fuel 27
+K 332.0h LN explore/- DOT sleep/- kameHunger 0.59
+K 334.0h LN explore/- DOT sleep/- kameHunger 0.66
+K 336.0h LN explore/- DOT look/- kameHunger 0.74
+L 336.0h wood green 45.3 seasoned 26.7 clay 6.1 pots g/d/f 1/0/2 equip firewood_stack,open_fire_pit,cook_pot,lamp_dish,tar_retort felled 27 fuel 27
+K 338.0h LN rest/- DOT look/- kameHunger 0.33
+K 340.0h LN sleep/- DOT look/- kameHunger 0.33
+K 342.0h LN sleep/- DOT look/- kameHunger 0.22
+L 342.0h wood green 45.3 seasoned 26.7 clay 6.1 pots g/d/f 1/0/2 equip firewood_stack,open_fire_pit,cook_pot,lamp_dish,tar_retort felled 27 fuel 27
+K 344.0h LN sleep/- DOT wander/- kameHunger 0.42
+K 346.0h LN sleep/- DOT look/- kameHunger 0.13
+K 348.0h LN rest/- DOT say/- kameHunger 0.34
+L 348.0h wood green 45.3 seasoned 26.7 clay 6.1 pots g/d/f 1/0/2 equip firewood_stack,open_fire_pit,cook_pot,lamp_dish,tar_retort felled 27 fuel 27
+K 350.0h LN fire/- DOT fire/- kameHunger 0.34
+K 352.0h LN explore/- DOT sleep/- kameHunger 0.47
+K 354.0h LN explore/- DOT sleep/- kameHunger 0.54
+L 354.0h wood green 45.3 seasoned 26.3 clay 6.1 pots g/d/f 0/1/2 equip firewood_stack,open_fire_pit,cook_pot,lamp_dish,tar_retort felled 27 fuel 27
+K 356.0h LN explore/- DOT sleep/- kameHunger 0.62
+K 358.0h LN explore/- DOT sleep/- kameHunger 0.69
+K 360.0h LN stackwood/- DOT plant/- kameHunger 0.77
+L 360.0h wood green 53.1 seasoned 26.3 clay 6.1 pots g/d/f 0/1/2 equip firewood_stack,open_fire_pit,cook_pot,lamp_dish,tar_retort felled 29 fuel 29
+K 362.0h LN rest/- DOT look/- kameHunger 0.27
+K 364.0h LN sleep/- DOT look/- kameHunger 0.47
+K 366.0h LN sleep/- DOT look/- kameHunger 0.20
+L 366.0h wood green 53.1 seasoned 26.3 clay 6.1 pots g/d/f 0/1/2 equip firewood_stack,open_fire_pit,cook_pot,lamp_dish,tar_retort felled 29 fuel 29
+K 368.0h LN sleep/- DOT look/- kameHunger 0.39
+K 370.0h LN sleep/- DOT look/- kameHunger 0.12
+K 372.0h LN rest/- DOT look/- kameHunger 0.34
+L 372.0h wood green 53.1 seasoned 26.3 clay 6.1 pots g/d/f 0/1/2 equip firewood_stack,open_fire_pit,cook_pot,lamp_dish,tar_retort felled 29 fuel 29
+K 374.0h LN fire/- DOT fire/- kameHunger 0.37
+K 376.0h LN explore/- DOT sleep/- kameHunger 0.25
+K 378.0h LN explore/- DOT sleep/- kameHunger 0.11
+L 378.0h wood green 53.1 seasoned 26.3 clay 6.1 pots g/d/f 0/1/2 equip firewood_stack,open_fire_pit,cook_pot,lamp_dish,tar_retort felled 29 fuel 29
+K 380.0h LN think/- DOT sleep/- kameHunger 0.19
+K 382.0h LN think/- DOT sleep/- kameHunger 0.26
+K 384.0h LN think/- DOT wander/- kameHunger 0.34
+L 384.0h wood green 53.1 seasoned 26.3 clay 6.1 pots g/d/f 0/1/2 equip firewood_stack,open_fire_pit,cook_pot,lamp_dish,tar_retort felled 29 fuel 29
+K 386.0h LN rest/- DOT look/- kameHunger 0.09
+K 388.0h LN sleep/- DOT wander/- kameHunger 0.29
+K 390.0h LN sleep/- DOT look/- kameHunger 0.12
+L 390.0h wood green 53.1 seasoned 26.3 clay 6.1 pots g/d/f 0/1/2 equip firewood_stack,open_fire_pit,cook_pot,lamp_dish,tar_retort felled 29 fuel 29
+K 392.0h LN sleep/- DOT wander/- kameHunger 0.26
+K 394.0h LN sleep/- DOT wander/- kameHunger 0.44
+K 396.0h LN rest/- DOT look/- kameHunger 0.18
+L 396.0h wood green 53.1 seasoned 26.3 clay 6.1 pots g/d/f 0/1/2 equip firewood_stack,open_fire_pit,cook_pot,lamp_dish,tar_retort felled 29 fuel 29
+K 398.0h LN fire/- DOT fire/- kameHunger 0.38
+K 400.0h LN think/- DOT sleep/- kameHunger 0.15
+K 402.0h LN think/- DOT sleep/- kameHunger 0.12
+L 402.0h wood green 53.1 seasoned 26.3 clay 6.1 pots g/d/f 0/1/2 equip firewood_stack,open_fire_pit,cook_pot,lamp_dish,tar_retort felled 29 fuel 29
+K 404.0h LN think/- DOT sleep/- kameHunger 0.19
+K 406.0h LN explore/- DOT sleep/- kameHunger 0.26
+K 408.0h LN think/- DOT harvest/- kameHunger 0.34
+L 408.0h wood green 53.1 seasoned 26.3 clay 6.1 pots g/d/f 0/1/2 equip firewood_stack,open_fire_pit,cook_pot,lamp_dish,tar_retort felled 29 fuel 29
+K 410.0h LN rest/- DOT look/- kameHunger 0.06
+K 412.0h LN sleep/- DOT look/- kameHunger 0.28
+K 414.0h LN sleep/- DOT shelter/- kameHunger 0.44
+L 414.0h wood green 53.1 seasoned 26.3 clay 6.1 pots g/d/f 0/1/2 equip firewood_stack,open_fire_pit,cook_pot,lamp_dish,tar_retort felled 29 fuel 29
+K 416.0h LN shelter/- DOT shelter/- kameHunger 0.18
+K 418.0h LN sleep/- DOT idle/- kameHunger 0.38
+K 420.0h LN rest/- DOT look/- kameHunger 0.12
+L 420.0h wood green 0 seasoned 41.4 clay 5.5 pots g/d/f 1/0/3 equip firewood_stack,open_fire_pit,cook_pot,lamp_dish,tar_retort felled 29 fuel 29
+K 422.0h LN fire/- DOT fire/- kameHunger 0.31
+K 424.0h LN think/- DOT sleep/- kameHunger 0.08
+K 426.0h LN think/- DOT sleep/- kameHunger 0.12
+L 426.0h wood green 0 seasoned 41 clay 5.5 pots g/d/f 1/0/3 equip firewood_stack,open_fire_pit,cook_pot,lamp_dish,tar_retort felled 29 fuel 29
+K 428.0h LN explore/- DOT sleep/- kameHunger 0.19
+K 430.0h LN think/- DOT sleep/- kameHunger 0.26
+K 432.0h LN think/- DOT plant/- kameHunger 0.35
+L 432.0h wood green 0 seasoned 41 clay 5.5 pots g/d/f 1/0/3 equip firewood_stack,open_fire_pit,cook_pot,lamp_dish,tar_retort felled 29 fuel 29
+K 434.0h LN rest/- DOT wander/- kameHunger 0.08
+K 436.0h LN sleep/- DOT look/- kameHunger 0.27
+K 438.0h LN sleep/- DOT look/- kameHunger 0.28
+L 438.0h wood green 0 seasoned 41 clay 5.5 pots g/d/f 1/0/3 equip firewood_stack,open_fire_pit,cook_pot,lamp_dish,tar_retort felled 29 fuel 29
+K 440.0h LN sleep/- DOT look/- kameHunger 0.21
+K 442.0h LN sleep/- DOT look/- kameHunger 0.38
+K 444.0h LN rest/- DOT wander/- kameHunger 0.10
+L 444.0h wood green 0 seasoned 41 clay 5.5 pots g/d/f 1/0/3 equip firewood_stack,open_fire_pit,cook_pot,lamp_dish,tar_retort felled 29 fuel 29
+K 446.0h LN fire/- DOT fire/- kameHunger 0.30
+K 448.0h LN explore/- DOT sleep/- kameHunger 0.05
+K 450.0h LN explore/- DOT sleep/- kameHunger 0.12
+L 450.0h wood green 0 seasoned 41 clay 5.5 pots g/d/f 1/0/3 equip firewood_stack,open_fire_pit,cook_pot,lamp_dish,tar_retort felled 29 fuel 29
+K 452.0h LN think/- DOT sleep/- kameHunger 0.19
+K 454.0h LN explore/- DOT sleep/- kameHunger 0.27
+K 456.0h LN explore/- DOT plant/- kameHunger 0.35
+L 456.0h wood green 0 seasoned 41 clay 5.5 pots g/d/f 1/0/3 equip firewood_stack,open_fire_pit,cook_pot,lamp_dish,tar_retort felled 29 fuel 29
+K 458.0h LN shelter/- DOT shelter/- kameHunger 0.07
+K 460.0h LN sleep/- DOT wander/- kameHunger 0.28
+K 462.0h LN sleep/- DOT look/- kameHunger 0.38
+L 462.0h wood green 0 seasoned 41 clay 5.5 pots g/d/f 1/0/3 equip firewood_stack,open_fire_pit,cook_pot,lamp_dish,tar_retort felled 29 fuel 29
+K 464.0h LN sleep/- DOT wander/- kameHunger 0.20
+K 466.0h LN sleep/- DOT look/- kameHunger 0.38
+K 468.0h LN rest/- DOT look/- kameHunger 0.11
+L 468.0h wood green 0 seasoned 41 clay 5.5 pots g/d/f 1/0/3 equip firewood_stack,open_fire_pit,cook_pot,lamp_dish,tar_retort felled 29 fuel 29
+K 470.0h LN fire/- DOT fire/- kameHunger 0.29
+K 472.0h LN think/- DOT sleep/- kameHunger 0.43
+K 474.0h LN explore/- DOT sleep/- kameHunger 0.50
+L 474.0h wood green 0 seasoned 9.8 clay 5.5 pots g/d/f 0/0/3 equip firewood_stack,open_fire_pit,cook_pot,lamp_dish,tar_retort,assembled_pot felled 29 fuel 29
+K 476.0h LN explore/- DOT sleep/- kameHunger 0.57
+K 478.0h LN think/- DOT sleep/- kameHunger 0.65
+K 480.0h LN explore/- DOT look/- kameHunger 0.73
+L 480.0h wood green 0 seasoned 9.8 clay 5.5 pots g/d/f 0/0/3 equip firewood_stack,open_fire_pit,cook_pot,lamp_dish,tar_retort,assembled_pot felled 29 fuel 29
+K 482.0h LN rest/- DOT look/- kameHunger 0.09
+K 484.0h LN sleep/- DOT look/- kameHunger 0.31
+K 486.0h LN sleep/- DOT look/- kameHunger 0.07
+L 486.0h wood green 0 seasoned 9.8 clay 5.5 pots g/d/f 0/0/3 equip firewood_stack,open_fire_pit,cook_pot,lamp_dish,tar_retort,assembled_pot felled 29 fuel 29
+K 488.0h LN sleep/- DOT wander/- kameHunger 0.28
+K 490.0h LN sleep/- DOT look/- kameHunger 0.47
+K 492.0h LN rest/- DOT wander/- kameHunger 0.17
+L 492.0h wood green 0 seasoned 9.8 clay 5.5 pots g/d/f 0/0/3 equip firewood_stack,open_fire_pit,cook_pot,lamp_dish,tar_retort,assembled_pot felled 29 fuel 29
+K 494.0h LN fire/- DOT fire/- kameHunger 0.36
+K 496.0h LN explore/- DOT sleep/- kameHunger 0.13
+K 498.0h LN explore/- DOT sleep/- kameHunger 0.12
+L 498.0h wood green 0 seasoned 9.8 clay 5.5 pots g/d/f 0/0/3 equip firewood_stack,open_fire_pit,cook_pot,lamp_dish,tar_retort,assembled_pot felled 29 fuel 29
+K 500.0h LN explore/- DOT sleep/- kameHunger 0.19
+K 502.0h LN explore/- DOT sleep/- kameHunger 0.26
+K 504.0h LN think/- DOT look/- kameHunger 0.34
+L 504.0h wood green 0 seasoned 9.8 clay 5.5 pots g/d/f 0/0/3 equip firewood_stack,open_fire_pit,cook_pot,lamp_dish,tar_retort,assembled_pot felled 29 fuel 29
+K 506.0h LN rest/- DOT look/- kameHunger 0.14
+K 508.0h LN sleep/- DOT wander/- kameHunger 0.23
+K 510.0h LN sleep/- DOT wander/- kameHunger 0.15
+L 510.0h wood green 0 seasoned 9.8 clay 5.5 pots g/d/f 0/0/3 equip firewood_stack,open_fire_pit,cook_pot,lamp_dish,tar_retort,assembled_pot felled 29 fuel 29
+K 512.0h LN sleep/- DOT look/- kameHunger 0.23
+K 514.0h LN sleep/- DOT find/- kameHunger 0.41
+K 516.0h LN rest/- DOT look/- kameHunger 0.09
+L 516.0h wood green 0 seasoned 9.8 clay 5.5 pots g/d/f 0/0/3 equip firewood_stack,open_fire_pit,cook_pot,lamp_dish,tar_retort,assembled_pot felled 29 fuel 29
+K 518.0h LN fire/- DOT fire/- kameHunger 0.29
+K 520.0h LN explore/- DOT sleep/- kameHunger 0.06
+K 522.0h LN explore/- DOT sleep/- kameHunger 0.12
+L 522.0h wood green 0 seasoned 9.8 clay 5.5 pots g/d/f 0/0/3 equip firewood_stack,open_fire_pit,cook_pot,lamp_dish,tar_retort,assembled_pot felled 29 fuel 29
+K 524.0h LN explore/- DOT sleep/- kameHunger 0.19
+K 526.0h LN think/- DOT sleep/- kameHunger 0.26
+K 528.0h LN think/- DOT look/- kameHunger 0.35
+L 528.0h wood green 0 seasoned 9.8 clay 5.5 pots g/d/f 0/0/3 equip firewood_stack,open_fire_pit,cook_pot,lamp_dish,tar_retort,assembled_pot felled 29 fuel 29
+K 530.0h LN rest/- DOT look/- kameHunger 0.09
+K 532.0h LN sleep/- DOT wander/- kameHunger 0.29
+K 534.0h LN sleep/- DOT wander/- kameHunger 0.29
+L 534.0h wood green 0 seasoned 9.8 clay 5.5 pots g/d/f 0/0/3 equip firewood_stack,open_fire_pit,cook_pot,lamp_dish,tar_retort,assembled_pot felled 29 fuel 29
+K 536.0h LN sleep/- DOT wander/- kameHunger 0.22
+K 538.0h LN sleep/- DOT look/- kameHunger 0.40
+K 540.0h LN rest/- DOT look/- kameHunger 0.09
+L 540.0h wood green 0 seasoned 9.8 clay 5.5 pots g/d/f 0/0/3 equip firewood_stack,open_fire_pit,cook_pot,lamp_dish,tar_retort,assembled_pot felled 29 fuel 29
+K 542.0h LN fire/- DOT fire/- kameHunger 0.29
+K 544.0h LN think/- DOT sleep/- kameHunger 0.45
+K 546.0h LN think/- DOT sleep/- kameHunger 0.52
+L 546.0h wood green 0 seasoned 9.5 clay 5.5 pots g/d/f 0/0/3 equip firewood_stack,open_fire_pit,cook_pot,lamp_dish,tar_retort,assembled_pot felled 29 fuel 29
+K 548.0h LN think/- DOT sleep/- kameHunger 0.59
+K 550.0h LN explore/- DOT sleep/- kameHunger 0.66
+K 552.0h LN think/- DOT look/- kameHunger 0.74
+L 552.0h wood green 0 seasoned 9.5 clay 5.5 pots g/d/f 0/0/3 equip firewood_stack,open_fire_pit,cook_pot,lamp_dish,tar_retort,assembled_pot felled 29 fuel 29
+K 554.0h LN rest/- DOT wander/- kameHunger 0.20
+K 556.0h LN sleep/- DOT look/- kameHunger 0.41
+K 558.0h LN sleep/- DOT shelter/- kameHunger 0.14
+L 558.0h wood green 0 seasoned 9.5 clay 5.5 pots g/d/f 0/0/3 equip firewood_stack,open_fire_pit,cook_pot,lamp_dish,tar_retort,assembled_pot felled 29 fuel 29
+K 560.0h LN sleep/- DOT look/- kameHunger 0.34
+K 562.0h LN sleep/- DOT look/- kameHunger 0.18
+K 564.0h LN rest/- DOT look/- kameHunger 0.22
+L 564.0h wood green 0 seasoned 9.5 clay 5.5 pots g/d/f 0/0/3 equip firewood_stack,open_fire_pit,cook_pot,lamp_dish,tar_retort,assembled_pot felled 29 fuel 29
+K 566.0h LN fire/- DOT fire/- kameHunger 0.41
+K 568.0h LN explore/- DOT sleep/- kameHunger 0.06
+K 570.0h LN think/- DOT sleep/- kameHunger 0.13
+L 570.0h wood green 0 seasoned 9.5 clay 5.5 pots g/d/f 0/0/3 equip firewood_stack,open_fire_pit,cook_pot,lamp_dish,tar_retort,assembled_pot felled 29 fuel 29
+K 572.0h LN explore/- DOT sleep/- kameHunger 0.20
+K 574.0h LN shelter/- DOT shelter/- kameHunger 0.27
+K 576.0h LN explore/- DOT look/- kameHunger 0.35
+L 576.0h wood green 0 seasoned 9.5 clay 5.5 pots g/d/f 0/0/3 equip firewood_stack,open_fire_pit,cook_pot,lamp_dish,tar_retort,assembled_pot felled 29 fuel 29
+K 578.0h LN rest/- DOT look/- kameHunger 0.08
+K 580.0h LN sleep/- DOT wander/- kameHunger 0.29
+K 582.0h LN sleep/- DOT look/- kameHunger 0.49
+L 582.0h wood green 0 seasoned 9.5 clay 5.5 pots g/d/f 0/0/3 equip firewood_stack,open_fire_pit,cook_pot,lamp_dish,tar_retort,assembled_pot felled 29 fuel 29
+K 584.0h LN sleep/- DOT look/- kameHunger 0.20
+K 586.0h LN sleep/- DOT wander/- kameHunger 0.39
+K 588.0h LN rest/- DOT look/- kameHunger 0.12
+L 588.0h wood green 0 seasoned 9.5 clay 5.5 pots g/d/f 0/0/3 equip firewood_stack,open_fire_pit,cook_pot,lamp_dish,tar_retort,assembled_pot felled 29 fuel 29
+K 590.0h LN fire/- DOT fire/- kameHunger 0.31
+K 592.0h LN think/- DOT sleep/- kameHunger 0.45
+K 594.0h LN explore/- DOT sleep/- kameHunger 0.52
+L 594.0h wood green 0 seasoned 9.5 clay 5.5 pots g/d/f 0/0/3 equip firewood_stack,open_fire_pit,cook_pot,lamp_dish,tar_retort,assembled_pot felled 29 fuel 29
+K 596.0h LN explore/- DOT sleep/- kameHunger 0.59
+K 598.0h LN explore/- DOT sleep/- kameHunger 0.66
+K 600.0h LN think/- DOT look/- kameHunger 0.75
+L 600.0h wood green 0 seasoned 9.5 clay 5.5 pots g/d/f 0/0/3 equip firewood_stack,open_fire_pit,cook_pot,lamp_dish,tar_retort,assembled_pot felled 29 fuel 29
+K 602.0h LN rest/- DOT look/- kameHunger 0.07
+K 604.0h LN sleep/- DOT idle/- kameHunger 0.26
+K 606.0h LN sleep/- DOT look/- kameHunger 0.46
+L 606.0h wood green 0 seasoned 9.5 clay 5.5 pots g/d/f 0/0/3 equip firewood_stack,open_fire_pit,cook_pot,lamp_dish,tar_retort,assembled_pot felled 29 fuel 29
+K 608.0h LN sleep/- DOT look/- kameHunger 0.16
+K 610.0h LN sleep/- DOT look/- kameHunger 0.35
+K 612.0h LN rest/- DOT look/- kameHunger 0.08
+L 612.0h wood green 0 seasoned 9.5 clay 5.5 pots g/d/f 0/0/3 equip firewood_stack,open_fire_pit,cook_pot,lamp_dish,tar_retort,assembled_pot felled 29 fuel 29
+K 614.0h LN shelter/- DOT shelter/- kameHunger 0.27
+K 616.0h LN shelter/- DOT shelter/- kameHunger 0.42
+K 618.0h LN explore/- DOT sleep/- kameHunger 0.49
+L 618.0h wood green 0 seasoned 9.5 clay 5.5 pots g/d/f 0/0/3 equip firewood_stack,open_fire_pit,cook_pot,lamp_dish,tar_retort,assembled_pot felled 29 fuel 29
+K 620.0h LN explore/- DOT sleep/- kameHunger 0.56
+K 622.0h LN think/- DOT sleep/- kameHunger 0.63
+K 624.0h LN think/- DOT wander/- kameHunger 0.71
+L 624.0h wood green 0 seasoned 9.5 clay 5.5 pots g/d/f 0/0/3 equip firewood_stack,open_fire_pit,cook_pot,lamp_dish,tar_retort,assembled_pot felled 29 fuel 29
+K 626.0h LN rest/- DOT look/- kameHunger 0.09
+K 628.0h LN sleep/- DOT look/- kameHunger 0.30
+K 630.0h LN sleep/- DOT look/- kameHunger 0.25
+L 630.0h wood green 0 seasoned 9.5 clay 5.5 pots g/d/f 0/0/3 equip firewood_stack,open_fire_pit,cook_pot,lamp_dish,tar_retort,assembled_pot felled 29 fuel 29
+K 632.0h LN sleep/- DOT look/- kameHunger 0.24
+K 634.0h LN sleep/- DOT look/- kameHunger 0.41
+K 636.0h LN rest/- DOT wander/- kameHunger 0.15
+L 636.0h wood green 0 seasoned 9.5 clay 5.5 pots g/d/f 0/0/3 equip firewood_stack,open_fire_pit,cook_pot,lamp_dish,tar_retort,assembled_pot felled 29 fuel 29
+K 638.0h LN fire/- DOT fire/- kameHunger 0.34
+K 640.0h LN explore/- DOT sleep/- kameHunger 0.12
+K 642.0h LN explore/- DOT sleep/- kameHunger 0.12
+L 642.0h wood green 0 seasoned 9.5 clay 5.5 pots g/d/f 0/0/3 equip firewood_stack,open_fire_pit,cook_pot,lamp_dish,tar_retort,assembled_pot felled 29 fuel 29
+K 644.0h LN explore/- DOT sleep/- kameHunger 0.19
+K 646.0h LN explore/- DOT sleep/- kameHunger 0.26
+K 648.0h LN explore/- DOT shelve/drift kameHunger 0.34
+L 648.0h wood green 0 seasoned 9.5 clay 5.5 pots g/d/f 0/0/3 equip firewood_stack,open_fire_pit,cook_pot,lamp_dish,tar_retort,assembled_pot felled 29 fuel 29
+K 650.0h LN rest/- DOT wander/- kameHunger 0.06
+K 652.0h LN sleep/- DOT look/- kameHunger 0.28
+K 654.0h LN sleep/- DOT wander/- kameHunger 0.46
+L 654.0h wood green 0 seasoned 9.5 clay 5.5 pots g/d/f 0/0/3 equip firewood_stack,open_fire_pit,cook_pot,lamp_dish,tar_retort,assembled_pot felled 29 fuel 29
+K 656.0h LN sleep/- DOT look/- kameHunger 0.14
+K 658.0h LN sleep/- DOT look/- kameHunger 0.33
+K 660.0h LN rest/- DOT wander/- kameHunger 0.06
+L 660.0h wood green 0 seasoned 9.5 clay 5.5 pots g/d/f 0/0/3 equip firewood_stack,open_fire_pit,cook_pot,lamp_dish,tar_retort,assembled_pot felled 29 fuel 29
+K 662.0h LN fire/- DOT fire/- kameHunger 0.24
+K 664.0h LN explore/- DOT sleep/- kameHunger 0.39
+K 666.0h LN explore/- DOT sleep/- kameHunger 0.46
+L 666.0h wood green 0 seasoned 9.5 clay 5.5 pots g/d/f 0/0/3 equip firewood_stack,open_fire_pit,cook_pot,lamp_dish,tar_retort,assembled_pot felled 29 fuel 29
+K 668.0h LN explore/- DOT sleep/- kameHunger 0.53
+K 670.0h LN explore/- DOT sleep/- kameHunger 0.60
+K 672.0h LN explore/- DOT harvest/- kameHunger 0.69
+L 672.0h wood green 0 seasoned 9.5 clay 5.5 pots g/d/f 0/0/3 equip firewood_stack,open_fire_pit,cook_pot,lamp_dish,tar_retort,assembled_pot felled 29 fuel 29
+K 674.0h LN rest/- DOT wander/- kameHunger 0.25
+K 676.0h LN sleep/- DOT wander/- kameHunger 0.46
+K 678.0h LN sleep/- DOT wander/- kameHunger 0.20
+L 678.0h wood green 0 seasoned 9.5 clay 5.5 pots g/d/f 0/0/3 equip firewood_stack,open_fire_pit,cook_pot,lamp_dish,tar_retort,assembled_pot felled 29 fuel 29
+K 680.0h LN sleep/- DOT look/- kameHunger 0.38
+K 682.0h LN sleep/- DOT wander/- kameHunger 0.08
+K 684.0h LN rest/- DOT harvest/- kameHunger 0.28
+L 684.0h wood green 0 seasoned 9.5 clay 5.5 pots g/d/f 0/0/3 equip firewood_stack,open_fire_pit,cook_pot,lamp_dish,tar_retort,assembled_pot felled 29 fuel 29
+K 686.0h LN fire/- DOT fire/- kameHunger 0.47
+K 688.0h LN think/- DOT sleep/- kameHunger 0.60
+K 690.0h LN think/- DOT sleep/- kameHunger 0.67
+L 690.0h wood green 0 seasoned 9.5 clay 5.5 pots g/d/f 0/0/3 equip firewood_stack,open_fire_pit,cook_pot,lamp_dish,tar_retort,assembled_pot felled 29 fuel 29
+K 692.0h LN explore/- DOT sleep/- kameHunger 0.74
+K 694.0h LN think/- DOT sleep/- kameHunger 0.81
+K 696.0h LN explore/- DOT look/- kameHunger 0.89
+L 696.0h wood green 0 seasoned 9.5 clay 5.5 pots g/d/f 0/0/3 equip firewood_stack,open_fire_pit,cook_pot,lamp_dish,tar_retort,assembled_pot felled 29 fuel 29
+K 698.0h LN rest/- DOT look/- kameHunger 1.00
+K 700.0h LN sleep/- DOT look/- kameHunger 0.81
+K 702.0h LN sleep/- DOT look/- kameHunger 0.22
+L 702.0h wood green 0 seasoned 9.5 clay 5.5 pots g/d/f 0/0/3 equip firewood_stack,open_fire_pit,cook_pot,lamp_dish,tar_retort,assembled_pot felled 29 fuel 29
+K 704.0h LN sleep/- DOT look/- kameHunger 0.41
+K 706.0h LN sleep/- DOT look/- kameHunger 0.21
+K 708.0h LN rest/- DOT look/- kameHunger 0.41
+L 708.0h wood green 0 seasoned 9.5 clay 5.5 pots g/d/f 0/0/3 equip firewood_stack,open_fire_pit,cook_pot,lamp_dish,tar_retort,assembled_pot felled 29 fuel 29
+K 710.0h LN fire/- DOT fire/- kameHunger 0.18
+K 712.0h LN explore/- DOT sleep/- kameHunger 0.32
+K 714.0h LN explore/- DOT sleep/- kameHunger 0.39
+L 714.0h wood green 0 seasoned 9.5 clay 5.5 pots g/d/f 0/0/3 equip firewood_stack,open_fire_pit,cook_pot,lamp_dish,tar_retort,assembled_pot felled 29 fuel 29
+K 716.0h LN think/- DOT sleep/- kameHunger 0.47
+K 718.0h LN explore/- DOT sleep/- kameHunger 0.54
+log
+31.5h chop ドット：若木を切り倒した（枝は薪にして棚の脇へ）
+31.7h chop ドット：若木を切り倒した（枝は薪にして棚の脇へ）
+31.9h chop ドット：若木を切り倒した（枝は薪にして棚の脇へ）
+32.1h raft ドットの筏ができた
+47.1h science ランタンの工程：粘土を紐にして積み、鍋を形づくる：できた（形づくった器 1421.7g・下ごしらえした粘土 2550.1g）。気づいたこと：鍋の形ができた（壁の厚さ 8 mm ほど）。表面はやわらかく、指の跡が残る
+48.2h chop ドット：薪にするため、林のオオハマボウを切り倒した（高さ約8m。丸太3本、枝は薪にして棚の脇へ）
+48.2h chop ドットが薪にするため、林の木を切り倒した
+48.3h chop ドット：薪にするため、林のオオハマボウを切り倒した（高さ約6m。丸太2本、枝は薪にして棚の脇へ）
+48.3h chop ドットが薪にするため、林の木を切り倒した
+48.4h science ランタンの工程：粘土を紐にして積み、鍋を形づくる：できた（形づくった器 1421.7g・下ごしらえした粘土 1128.3g）。気づいたこと：鍋の形ができた（壁の厚さ 8 mm ほど）。表面はやわらかく、指の跡が残る
+48.8h raft ドットの筏ができた
+48.9h chop ドット：薪にするため、林のオオハマボウを切り倒した（高さ約4m。丸太2本、枝は薪にして棚の脇へ）
+48.9h chop ドットが薪にするため、林の木を切り倒した
+49.0h chop ドット：薪にするため、林のオオハマボウを切り倒した（高さ約3m。丸太2本、枝は薪にして棚の脇へ）
+49.0h chop ドットが薪にするため、林の木を切り倒した
+72.8h science ランタンの工程：器を棚で乾かす（葉で覆って）：できた（乾いた器 1147.5g）。気づいたこと：全体が白っぽく乾いて、軽い
+74.2h science ランタンの工程：器を棚で乾かす（葉で覆って）：できた（乾いた器 1148.2g）。気づいたこと：全体が白っぽく乾いて、軽い
+107.1h science ランタンの野焼きで、島で初めて器が焼けた
+107.1h science ランタンの工程：乾いた器を野焼きする（焚き火で囲んで焼く）：できた（焼いた器 1015.8g・焼いた器 1015.8g・薪 7847.6g・灰 223.1g）。気づいたこと：いちばん熱いときの火の色：桜色がかった赤、ひびは見当たらない、やや鈍いが、焼けた音
+107.2h science ランタン：焼いた器が、島の鍋になった
+107.2h science ランタンの工程：ヤシのミルクを煮て油をとる：できた（ヤシ油 62.8g・油をとったかす 31.6g・薪 7524.2g・灰 2.4g）。気づいたこと：香ばしい甘いにおい、かすが茶色になり、油が澄んでいる、澄んだ淡い色の油が分かれた
+108.0h science ランタンの工程：粘土で灯皿を形づくる：できた（形づくった器 114.2g・下ごしらえした粘土 1014.1g）。気づいたこと：灯皿の形ができた（壁の厚さ 6 mm ほど）。表面はやわらかく、指の跡が残る
+108.1h chop ドット：薪にするため、林のオオハマボウを切り倒した（高さ約3m。丸太2本、枝は薪にして棚の脇へ）
+108.1h chop ドットが薪にするため、林の木を切り倒した
+108.1h chop ドット：薪にするため、林のオオハマボウを切り倒した（高さ約6m。丸太2本、枝は薪にして棚の脇へ）
+108.1h chop ドットが薪にするため、林の木を切り倒した
+108.2h chop ドット：薪にするため、林のオオハマボウを切り倒した（高さ約7m。丸太3本、枝は薪にして棚の脇へ）
+108.2h chop ドットが薪にするため、林の木を切り倒した
+108.2h chop ドット：薪にするため、林のオオハマボウを切り倒した（高さ約7m。丸太2本、枝は薪にして棚の脇へ）
+108.2h chop ドットが薪にするため、林の木を切り倒した
+108.3h chop ドット：薪にするため、林のオオハマボウを切り倒した（高さ約7m。丸太2本、枝は薪にして棚の脇へ）
+108.3h chop ドットが薪にするため、林の木を切り倒した
+108.4h chop ドット：薪にするため、林のオオハマボウを切り倒した（高さ約8m。丸太3本、枝は薪にして棚の脇へ）
+108.4h chop ドットが薪にするため、林の木を切り倒した
+133.8h science ランタンの工程：器を棚で乾かす（葉で覆って）：できた（乾いた器 91.1g）。気づいたこと：全体が白っぽく乾いて、軽い
+164.8h science ランタンの工程：乾いた器を野焼きする（焚き火で囲んで焼く）：できた（焼いた器 81.6g・薪 16528g・灰 221.9g）。気づいたこと：いちばん熱いときの火の色：桜色がかった赤、細いひびが見える、やや鈍いが、焼けた音
+165.2h science ランタンの工程：粘土で灯皿を形づくる：できた（形づくった器 114.2g・下ごしらえした粘土 7759.4g）。気づいたこと：灯皿の形ができた（壁の厚さ 6 mm ほど）。表面はやわらかく、指の跡が残る
+168.1h chop ドット：薪にするため、林のオオハマボウを切り倒した（高さ約9m。丸太3本、枝は薪にして棚の脇へ）
+168.1h chop ドットが薪にするため、林の木を切り倒した
+168.2h chop ドット：薪にするため、林のオオハマボウを切り倒した（高さ約8m。丸太3本、枝は薪にして棚の脇へ）
+168.2h chop ドットが薪にするため、林の木を切り倒した
+168.3h chop ドット：薪にするため、林のオオハマボウを切り倒した（高さ約4m。丸太2本、枝は薪にして棚の脇へ）
+168.3h chop ドットが薪にするため、林の木を切り倒した
+168.3h chop ドット：薪にするため、林のオオハマボウを切り倒した（高さ約9m。丸太3本、枝は薪にして棚の脇へ）
+168.3h chop ドットが薪にするため、林の木を切り倒した
+168.4h chop ドット：薪にするため、林のオオハマボウを切り倒した（高さ約8m。丸太3本、枝は薪にして棚の脇へ）
+168.4h chop ドットが薪にするため、林の木を切り倒した
+168.4h chop ドット：薪にするため、林のオオハマボウを切り倒した（高さ約3m。丸太2本、枝は薪にして棚の脇へ）
+168.4h chop ドットが薪にするため、林の木を切り倒した
+171.5h haul ドット：台風に備えて、筏を浜の上へ引き上げた
+191.0h science ランタンの工程：器を棚で乾かす（葉で覆って）：できた（乾いた器 93.1g）。気づいたこと：全体が白っぽく乾いて、軽い
+227.1h science ランタンの工程：乾いた器を野焼きする（焚き火で囲んで焼く）：できた（焼いた器 83.6g・薪 24126.7g・灰 227.2g）。気づいたこと：いちばん熱いときの火の色：桜色がかった赤、ひびは見当たらない、やや鈍いが、焼けた音
+228.9h science ランタンの工程：粘土で乾留の器の上の壺（2L）を形づくる：途中でやめた（材料はそのまま）
+232.4h science ランタンの工程：粘土で乾留の器の上の壺（2L）を形づくる：できた（形づくった器 1575.3g・下ごしらえした粘土 6184.2g）。気づいたこと：壺の形ができた（壁の厚さ 9 mm ほど）。表面はやわらかく、指の跡が残る
+233.0h science ランタンの工程：粘土で乾留の器の下の壺（0.3L）を形づくる：できた（形づくった器 444.7g・下ごしらえした粘土 569.4g）。気づいたこと：壺の形ができた（壁の厚さ 9 mm ほど）。表面はやわらかく、指の跡が残る
+239.9h chop ドット：薪にするため、林のオオハマボウを切り倒した（高さ約9m。丸太3本、枝は薪にして棚の脇へ）
+239.9h chop ドットが薪にするため、林の木を切り倒した
+239.9h chop ドット：薪にするため、林のオオハマボウを切り倒した（高さ約7m。丸太3本、枝は薪にして棚の脇へ）
+239.9h chop ドットが薪にするため、林の木を切り倒した
+240.0h chop ドット：薪にするため、林のオオハマボウを切り倒した（高さ約8m。丸太3本、枝は薪にして棚の脇へ）
+240.0h chop ドットが薪にするため、林の木を切り倒した
+240.1h chop ドット：薪にするため、林のオオハマボウを切り倒した（高さ約7m。丸太3本、枝は薪にして棚の脇へ）
+240.1h chop ドットが薪にするため、林の木を切り倒した
+240.1h chop ドット：薪にするため、林のオオハマボウを切り倒した（高さ約6m。丸太2本、枝は薪にして棚の脇へ）
+240.1h chop ドットが薪にするため、林の木を切り倒した
+240.2h chop ドット：薪にするため、林のオオハマボウを切り倒した（高さ約7m。丸太3本、枝は薪にして棚の脇へ）
+240.2h chop ドットが薪にするため、林の木を切り倒した
+255.1h science ランタンの工程：ヤシのミルクを煮て油をとる：できた（ヤシ油 53.4g・油をとったかす 29.7g・薪 23810g・灰 2.3g）。気づいたこと：香ばしい甘いにおい、かすが茶色になり、油が澄んでいる、澄んだ淡い色の油が分かれた
+257.6h science ランタンが、島で初めて灯りをともした。焼いた灯皿に、島のヤシ油と、自分でよった芯で
+257.6h science ランタンの工程：灯皿にヤシ油を入れ、芯を立てて灯す：できた（ヤシ油 31.3g・ヤシ油 11.1g・芯 1.8g・芯の燃えさし 0g）。気づいたこと：芯の先に小さな炎がともった、黒く固まった芯の先を切りそろえた、灯を消した
+258.2h science ランタンの工程：器を棚で乾かす（葉で覆って）：できた（乾いた器 1298.9g）。気づいたこと：全体が白っぽく乾いて、軽い
+258.8h science ランタンの工程：器を棚で乾かす（葉で覆って）：できた（乾いた器 358.1g）。気づいたこと：全体が白っぽく乾いて、軽い
+281.5h science ランタンの工程：灯皿にヤシ油を入れ、芯を立てて灯す：できた（ヤシ油 31.5g・ヤシ油 11.1g・芯 0.8g・芯の燃えさし 0g）。気づいたこと：芯の先に小さな炎がともった、黒く固まった芯の先を切りそろえた、灯を消した
+299.1h science ランタンの工程：乾いた器を野焼きする（焚き火で囲んで焼く）：できた（焼いた器 1152.7g・焼いた器 317.7g・薪 30110.3g・灰 251.9g）。気づいたこと：いちばん熱いときの火の色：桜色がかった赤、ひびは見当たらない、やや鈍いが、焼けた音
+299.2h science ランタン：焼いた壺を2つ組んで、炭とタールをとる乾留の器ができた
+300.6h science ランタンの工程：粘土で封じる壺（0.5L）を形づくる：できた（形づくった器 625.1g・下ごしらえした粘土 5559g）。気づいたこと：壺の形ができた（壁の厚さ 9 mm ほど）。表面はやわらかく、指の跡が残る
+300.7h chop ドット：薪にするため、林のオオハマボウを切り倒した（高さ約6m。丸太2本、枝は薪にして棚の脇へ）
+300.7h chop ドットが薪にするため、林の木を切り倒した
+300.8h chop ドット：薪にするため、林のオオハマボウを切り倒した（高さ約3m。丸太2本、枝は薪にして棚の脇へ）
+300.8h chop ドットが薪にするため、林の木を切り倒した
+300.8h chop ドット：薪にするため、林のオオハマボウを切り倒した（高さ約2m。丸太2本、枝は薪にして棚の脇へ）
+300.8h chop ドットが薪にするため、林の木を切り倒した
+300.8h chop ドット：薪にするため、林のオオハマボウを切り倒した（高さ約3m。丸太2本、枝は薪にして棚の脇へ）
+300.8h chop ドットが薪にするため、林の木を切り倒した
+303.1h chop ドット：薪にするため、林のオオハマボウを切り倒した（高さ約4m。丸太2本、枝は薪にして棚の脇へ）
+303.1h chop ドットが薪にするため、林の木を切り倒した
+305.6h science ランタンの工程：灯皿にヤシ油を入れ、芯を立てて灯す：できた（ヤシ油 31.3g・ヤシ油 11.1g・芯 2g）。気づいたこと：油が白く固まっていて、芯に火がつかない、芯の先はまだ焦げていない
+326.4h science ランタンの工程：器を棚で乾かす（葉で覆って）：できた（形づくった器 522.4g）。気づいたこと：縁が先に白っぽくなり、胴はまだ色が濃い（革のかたさ）
+329.5h science ランタンの工程：灯皿にヤシ油を入れ、芯を立てて灯す：できた（ヤシ油 12.3g・ヤシ油 11.1g・芯 0.8g・芯の燃えさし 0g）。気づいたこと：芯の先に小さな炎がともった、黒く固まった芯の先を切りそろえた、灯を消した
+351.1h science ランタンの工程：ヤシのミルクを煮て油をとる：できた（ヤシ油 60.1g・油をとったかす 52.6g・薪 26326.9g・灰 3g）。気づいたこと：静かになった、かすが茶色になり、油が澄んでいる、澄んだ淡い色の油が分かれた
+352.8h science ランタンの工程：器を棚で乾かす（葉で覆って）：できた（乾いた器 514.6g）。気づいたこと：全体が白っぽく乾いて、軽い
+353.5h science ランタンの工程：灯皿にヤシ油を入れ、芯を立てて灯す：できた（ヤシ油 31.3g・ヤシ油 11.1g・芯 1.8g・芯の燃えさし 0g）。気づいたこと：油が白く固まっていて、芯に火がつかない、黒く固まった芯の先を切りそろえた
+359.9h chop ドット：薪にするため、林のオオハマボウを切り倒した（高さ約6m。丸太2本、枝は薪にして棚の脇へ）
+359.9h chop ドットが薪にするため、林の木を切り倒した
+359.9h chop ドット：薪にするため、林のテリハボクを切り倒した（高さ約3m。丸太2本、枝は薪にして棚の脇へ）
+359.9h chop ドットが薪にするため、林の木を切り倒した
+377.5h science ランタンの工程：灯皿にヤシ油を入れ、芯を立てて灯す：できた（ヤシ油 60.1g・ヤシ油 11.1g・芯 0.8g・芯の燃えさし 0g）。気づいたこと：油が白く固まっていて、芯に火がつかない、黒く固まった芯の先を切りそろえた
+401.6h science ランタンの工程：灯皿にヤシ油を入れ、芯を立てて灯す：できた（ヤシ油 17.6g・ヤシ油 11.1g・芯 1.8g・芯の燃えさし 0g）。気づいたこと：芯の先に小さな炎がともった、黒く固まった芯の先を切りそろえた、灯を消した
+419.2h science ランタンの工程：乾いた器を野焼きする（焚き火で囲んで焼く）：できた（焼いた器 457.5g・薪 41410.5g・灰 226.9g）。気づいたこと：いちばん熱いときの火の色：桜色がかった赤、細いひびが見える、やや鈍いが、焼けた音
+419.9h science ランタンの工程：粘土で封じる壺（0.5L）を形づくる：できた（形づくった器 625.1g・下ごしらえした粘土 4933.9g）。気づいたこと：壺の形ができた（壁の厚さ 9 mm ほど）。表面はやわらかく、指の跡が残る
+423.1h science ランタンの工程：ヤシのミルクを煮て油をとる：できた（ヤシ油 72.4g・油をとったかす 38.2g・薪 41020.5g・灰 2.8g）。気づいたこと：静かになった、かすが茶色になり、油が澄んでいる、澄んだ淡い色の油が分かれた
+425.6h science ランタンの工程：灯皿にヤシ油を入れ、芯を立てて灯す：できた（ヤシ油 42.2g・ヤシ油 11.1g・芯 0.6g・芯の燃えさし 0g）。気づいたこと：芯の先に小さな炎がともった、黒く固まった芯の先を切りそろえた、灯を消した
+445.7h science ランタンの工程：器を棚で乾かす（葉で覆って）：できた（形づくった器 520.6g）。気づいたこと：縁が先に白っぽくなり、胴はまだ色が濃い（革のかたさ）
+449.6h science ランタンの工程：灯皿にヤシ油を入れ、芯を立てて灯す：できた（ヤシ油 52.1g・ヤシ油 11.1g・芯 1.6g・芯の燃えさし 0g）。気づいたこと：芯の先に小さな炎がともった、黒く固まった芯の先を切りそろえた、灯を消した
+472.8h science ランタンの工程：器を棚で乾かす（葉で覆って）：できた（乾いた器 514.6g）。気づいたこと：全体が白っぽく乾いて、軽い
+473.4h science ランタンの工程：乾いた器を野焼きする（焚き火で囲んで焼く）：できた（焼いた器 457.5g・薪 9830.1g・灰 227.4g）。気づいたこと：いちばん熱いときの火の色：桜色がかった赤、ひびは見当たらない、やや鈍いが、焼けた音
+473.6h science ランタンの工程：灯皿にヤシ油を入れ、芯を立てて灯す：できた（ヤシ油 20.8g・ヤシ油 11.1g・芯 0.6g・芯の燃えさし 0g）。気づいたこと：芯の先に小さな炎がともった、黒く固まった芯の先を切りそろえた、灯を消した
+473.9h science ランタンの工程：器にタールを塗り、竹の管を栓に通して口を封じる：できた（焼いた器 510.3g）。気づいたこと：タールが固く、内側の表面に乗っているだけに見える、口を栓とタールでふさいだ
+497.5h science ランタンの工程：灯皿にヤシ油を入れ、芯を立てて灯す：できた（ヤシ油 36g・ヤシ油 11.1g・芯 1.6g・芯の燃えさし 0g）。気づいたこと：芯の先に小さな炎がともった、黒く固まった芯の先を切りそろえた、灯を消した
+507.5h haul ドット：台風に備えて、筏を浜の上へ引き上げた
+521.9h science ランタンの工程：灯皿にヤシ油を入れ、芯を立てて灯す：できた（ヤシ油 2.5g・ヤシ油 11.1g・芯 0.4g・芯の燃えさし 0g）。気づいたこと：芯の先に小さな炎がともった、黒く固まった芯の先を切りそろえた、灯を消した
+543.1h science ランタンの工程：ヤシのミルクを煮て油をとる：できた（ヤシ油 51.8g・油をとったかす 44g・薪 9486.8g・灰 2.5g）。気づいたこと：香ばしい甘いにおい、かすが茶色になり、油が澄んでいる、澄んだ淡い色の油が分かれた
+545.6h science ランタンの工程：灯皿にヤシ油を入れ、芯を立てて灯す：できた（ヤシ油 36g・ヤシ油 11.1g・芯 1.5g・芯の燃えさし 0g）。気づいたこと：油が白く固まっていて、芯に火がつかない、黒く固まった芯の先を切りそろえた
+569.5h science ランタンの工程：灯皿にヤシ油を入れ、芯を立てて灯す：できた（ヤシ油 34.5g・ヤシ油 11.1g・芯 0.4g・芯の燃えさし 0g）。気づいたこと：芯の先に小さな炎がともった、黒く固まった芯の先を切りそろえた、灯を消した
+593.5h science ランタンの工程：灯皿にヤシ油を入れ、芯を立てて灯す：できた（ヤシ油 19.7g・ヤシ油 11.1g・芯 1.4g・芯の燃えさし 0g）。気づいたこと：芯の先に小さな炎がともった、黒く固まった芯の先を切りそろえた、灯を消した
