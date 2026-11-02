@@ -1,0 +1,35 @@
+diff --git a/src/science/step/barometer-pot.ts b/src/science/step/barometer-pot.ts
+index 40fce20..075189a 100644
+--- a/src/science/step/barometer-pot.ts
++++ b/src/science/step/barometer-pot.ts
+@@ -134,7 +134,7 @@ export function barometerPotStep(req: ScienceStepRequest): ScienceStepResult {
+     const needMl = b.g.A * b.g.halfLengthM * 2 * 1e6 / 2; // both legs filled to the middle of the tube
+     if (b.g.form === 1 && water.amount.value / 1000 < needMl) return fail(`the tube needs at least ${needMl.toFixed(1)} mL of water to stand in both legs`);
+     if (!tKnown || !pKnown) return fail('the gauge is set only with known weather (air temperature and pressure)');
+-    const T0 = req.environment.airTempC! + 273.15, P0 = req.environment.pressureHPa! * 100, s0 = (P0 * b.g.V0) / T0;
++    const T0 = req.environment.airTempC! + 273.15, P0 = req.environment.pressureHPa! * 100, X0 = Number(process.env.X0 ?? 0) / 1000, kk = b.g.headK * pv('waterDensity') * pv('gravity'), s0 = ((P0 + kk * X0) * (b.g.V0 + b.g.A * X0)) / T0; (b.g as any).zeroM = X0;
+     // the leak is the pot's fixed conductance: airLeakTauMin is defined on the EMPTY pot (its whole capacity: table /5),
+     // so alpha = capacity / (T0 · τ), whatever water is put in it (0.2.1, Codex BW-A1: not the air volume V0 left above
+     // the water, which made a half-filled weather pot leak half as fast). For the U-tube V0 is the capacity: as before.
+@@ -215,6 +215,12 @@ export function barometerPotStep(req: ScienceStepRequest): ScienceStepResult {
+     if (t <= d.s.tMs) return;
+     const e = scan(t);
+     if (e?.kind === 'maybe') d.condition = 'unknown';
++    else if (e && e.kind === 'bottom' && process.env.BUBBLE && g.form === 2) {
++      // air bubbles in until the water stands at the tube's end; the gauge goes on
++      d.s = at(t); const kk = g.headK * pv('waterDensity') * pv('gravity'), x = -g.bottomM;
++      d.s.sLo = Math.max(d.s.sLo, ((d.ctl.Pa + kk * x) * (g.V0 + g.A * x)) / d.s.bLo); d.s.sHi = Math.max(d.s.sHi, ((d.ctl.Pa + kk * x) * (g.V0 + g.A * x)) / d.s.bHi);
++      (globalThis as any).BUBBLES = ((globalThis as any).BUBBLES ?? 0) + 1; return;
++    }
+     else if (e) {
+       d.condition = e.kind === 'top' ? 'spilled-top' : 'spilled-bottom'; d.spilledAt = e.at;
+       if (e.kind === 'top') d.spilledMg = Math.min(d.waterMg, Math.max(1, Math.round(e.excessM * g.A * 1e9)));
+@@ -239,7 +245,7 @@ export function barometerPotStep(req: ScienceStepRequest): ScienceStepResult {
+     // between two sampled seconds the level is within the tube by the samples' account (a sub-second excess is clamped)
+     const cl = (x: number) => Math.max(-g.bottomM, Math.min(g.topM, x));
+     const s = at(t), [xLo, xHi] = xBounds(s, d.ctl.Pa).map(cl);
+-    const mLo = Math.round(xLo / g.markM), mHi = Math.round(xHi / g.markM);
++    const z = (g as any).zeroM ?? 0, mLo = Math.round((xLo - z) / g.markM), mHi = Math.round((xHi - z) / g.markM);
+     if (mLo === mHi) obs(t, { value: mHi, unit: 'mark', precision: 1 }); else unreadable++;
+   };
+ 
