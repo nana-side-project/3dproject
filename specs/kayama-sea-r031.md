@@ -59,3 +59,10 @@
 - 石垣島のイルカ（ハンドウイルカ、ハシナガイルカは遭遇率が高くない）：https://ishigaki-pipi.com/archives/34441
 - 石西礁湖のサンゴの一斉産卵の条件（藤原ら）：https://www.jstage.jst.go.jp/article/jsfo/79/3/79_130/_pdf 、https://agriknowledge.affrc.go.jp/RN/2010900937
 - 産卵日は年でずれる：https://www.tohoku.ac.jp/japanese/2020/01/press20200122-02-sango.html
+
+## 追記（2026-11-02）：11〜1 月のマンタの割合（#166 の仮置き 0.15 への答え）
+- ヨナラ水道の月別の遭遇率（ダイビング店）：5〜10 月 70 %、11〜1 月 50 %。冬は南側のヨナラ・黒島で出会いやすい、という店もある。
+- #166 の 5〜10 月 0.5 は、遭遇率の約 0.7 倍。同じ倍率で、11〜1 月は **0.35**。
+- 案：`p: [0.35, 0.3, 0.3, 0.3, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.35, 0.35]`。
+- 出典：https://www.painushima-divesite.com/manta/ 、https://marinediving.com/topics/34361.html 、https://marea-ishigaki.jp/info/season/diving_season/
+- 注意：ドットたちの世界では、月は島の暦（islandDate）から入れる直しが要る（#166 のコメント）。
