@@ -510,7 +510,7 @@ export function makeResidents(loc: any, T: any, fishNames: string[], birdNames: 
   // Out from the beach in front of the hut into the lagoon: four pilings (a stone base Lantern brings,
   // a post Rakko swims out and sets on it) and eight deck planks Dot shapes and lays. Kamemaru surveys
   // it first. It starts once they have sat round the fire together a few times.
-  const village = { fires: 0, mornings: 0, pier: 'none' as 'none' | 'plan' | 'build' | 'done', bases: 0, posts: 0, deck: 0, treasures: [] as { what: string; who: string; at: number }[], map: emptyMap(), raft: { parts: 0, x: NaN, z: NaN, hauled: false, quick: false }, spare: 0, lampLog: [] as { at: number; fiber: number; lumenS: number; litS: number; soot: number }[], huskHost: emptyHuskHostState() as HuskHostState, cordHost: emptyCordHostState() as CordHostState, sailHost: emptySailHostState() as SailHostState, labRuns: [] as { runId: string; processId: string; key?: string; by: string; startOnClock: number; outAt?: number; felt?: string; next?: { action: string; params?: Record<string, number> }[]; lowered?: number }[], gaugeLog: [] as GaugeEntry[], catcher: null as null | { at: number; areaM2: number; capMg: number }, hypo: null as null | Hypo, hypo2: null as null | Hypo, hypoHistory: [] as { at: number; nextRunId?: string; hypothesis: Hypo }[],
+  const village = { fires: 0, mornings: 0, pier: 'none' as 'none' | 'plan' | 'build' | 'done', bases: 0, posts: 0, deck: 0, treasures: [] as { what: string; who: string; at: number }[], map: emptyMap(), raft: { parts: 0, x: NaN, z: NaN, hauled: false, quick: false }, spare: 0, lampLog: [] as { at: number; fiber: number; lumenS: number; litS: number; soot: number }[], huskHost: emptyHuskHostState() as HuskHostState, cordHost: emptyCordHostState() as CordHostState, sailHost: emptySailHostState() as SailHostState, labRuns: [] as { runId: string; processId: string; key?: string; by: string; startOnClock: number; outAt?: number; felt?: string; next?: { action: string; params?: Record<string, number> }[]; lowered?: number; stuck?: number }[], gaugeLog: [] as GaugeEntry[], catcher: null as null | { at: number; areaM2: number; capMg: number }, hypo: null as null | Hypo, hypo2: null as null | Hypo, hypoHistory: [] as { at: number; nextRunId?: string; hypothesis: Hypo }[],
     labDone: [] as { at: number; processId: string; ok: boolean }[], taught: {} as Record<string, number>, feedback: [] as { from: string; to: string; f: Frame; at: number }[], stormPrep: 0, heardOkAt: 0,
     swellGuess: { alarm: 0, hits: 0, falses: 0 },
     house: { n: 0, rope: 0, bamboo: 0, clay: 0, lost: 0, weighed: false },
@@ -564,7 +564,10 @@ export function makeResidents(loc: any, T: any, fishNames: string[], birdNames: 
   }
   /** The readings of one setup of a gauge (its own zero): never compared with another's. */
   const sameSetup = (g: GaugeEntry, processId: string, runId?: string) => g.processId === processId && g.runId === runId && g.mark !== undefined;
-  const TEST_GAUGE = 'm02x_air_barometer_test';
+  const TEST_GAUGE = 'm02x_air_barometer_test', WEATHER_POT = 'm03x_air_barometer_pot';
+  /** The weather pot's reading stuck — air let in at its tube's foot, or its water over the top (the science side's words,
+   *  as it happens and after): its marks will not come back. */
+  const POT_STUCK = /外の空気が泡になって壺に入った|壺に空気が入ったまま|管の上から水があふれた|水があふれて減ったまま/;
   // Absolute marks belong to a setup. Keep the old guess (including its unfinished alarm and tallies) as history,
   // not as an active prediction at the new zero. Untagged saved guesses have unknown provenance: do not re-label them.
   // The day-difference hypothesis remains usable, but only with two readings from the same setup (dayAgo below).
@@ -1678,7 +1681,8 @@ export function makeResidents(loc: any, T: any, fishNames: string[], birdNames: 
     if (r.id === 'lantern' && !r.holding && !sleepTime(r, hr) && !village.labRuns.some((x) => x.by === r.id && lab.runs[x.runId]?.status !== 'completed' && catalog.find((c) => c.processId === x.processId)?.tend === 'stay')) {   // (only hand work keeps it: a gauge left reading, wood left a month to season, a pot left to dry do not — life-run 2026-10-09)
       const pt = pitTask(); if (pt) return pt;   // (the clay pit first: the island's first tub)
       const wt = workshopTask(); if (wt) return wt;   // (tools, the woodpile, a fired pot made a cook pot)
-      const e = labReady()[0]; if (e) return task('lab', shelfStand(), 'work', e.entry.tend === 'stay' ? 4 * 3600 : 12, { data: { processId: e.entry.processId, key: e.entry.key, lotId: e.lot?.lotId ?? '', more: e.more.map((l) => l.lotId) } });
+      // (the weather pot first at dawn: its hours are few, and whatever else is ready keeps — else it waited day after day)
+      const ready = labReady(), e = ready.find((x) => x.entry.when === 'dawn') ?? ready[0]; if (e) return task('lab', shelfStand(), 'work', e.entry.tend === 'stay' ? 4 * 3600 : 12, { data: { processId: e.entry.processId, key: e.entry.key, lotId: e.lot?.lotId ?? '', more: e.more.map((l) => l.lotId) } });
     }
     // the pier, once they have agreed on it
     if (village.pier === 'plan' && r.id === 'kame') return task('survey', along(1), 'look', rr(60, 120));
@@ -2433,14 +2437,14 @@ export function makeResidents(loc: any, T: any, fishNames: string[], birdNames: 
   const shelfStand = (): [number, number] => { const w = atHut(1.6, -3.2); return [w.x, w.z]; };   // (in front of the shelf, clear of the hut: room for Lantern's wide body)
   // (a find carried to the shelf: to its stand, where there is room — the corner it went to before was walled in by what
   // was built by the shelf, and Lantern carried a find for days, its hands full, the pit fire waiting: science,
-  // reviews/201-f18a02d. Three tries that did not get there, and it is set down where it is, kept with the finds all the
-  // same: its hands free)
+  // reviews/201-f18a02d. Three tries that did not get there, and it is set down at the front of the shelf — kept with the
+  // finds, on the shelf's count and drawn there, and said so: science on #209, the diary and the count to agree)
   function shelveTask(r: Resident): Task | null {
     if (r.holding !== 'drift') return null;
     if ((r.mo.shelveTries = (r.mo.shelveTries ?? 0) + 1) <= 3) return task('shelve', shelfStand(), 'work', 4);
     const what = drift.kind >= 0 ? DRIFT[drift.kind].ja : '見つけたもの';
     r.holding = ''; r.mo.shelveTries = 0; village.treasures.push({ what, who: r.v.name, at: clockMs }); drift.kind = -1; drift.t = 0; drawShelf();
-    note(r, 'find', { thing: what }, `${what}を棚まで運べなかったので、その場に置いた`);
+    note(r, 'find', { thing: what }, `${what}を棚の奥まで運べなかったので、棚の手前に置いた`);
     return null;
   }
   /** The catalog entry a run or a task meant (two entries can share a process: the pot shaped as a cook pot or a lamp dish). */
@@ -2475,6 +2479,9 @@ export function makeResidents(loc: any, T: any, fishNames: string[], birdNames: 
       if (entry.tend === 'stay' && [entry.equipment, ...(entry.moreEquipment ?? [])].some((q) => q?.kind === 'open_fire_pit') && calledSoon(byId.lantern, 0.75)) return [];
       // (the lamp at dusk, on the island's own hours: lit as the light goes, not in the afternoon)
       if (entry.when === 'dusk') { const hr = localHour(clockMs); if (hr < 18.3 || hr > 20.5) return []; }
+      // (the weather pot at dawn, the coolest of the day: what is to come warms it, its tube's water rises — science,
+      // specs/weather-pot-spill.md)
+      if (entry.when === 'dawn') { const hr = localHour(clockMs); if (hr < 4.5 || hr > 7.5) return []; }
       // (the oil soaked into the dish's wall goes in with the dish: it is the dish's, kept where the dish is)
       // (the lamp's wick: one of a fibre not yet tried first, then the one that gave the most light)
       if (entry.equipment?.kind === LAMP_DISH_ASSEMBLY.kind) { const k = (entry.also ?? []).findIndex((a) => a.input === 'lamp_wick'), ws = shelfLots().filter((l) => l.materialId === 'lamp_wick' && !(l as any).reservedBy);
@@ -2605,7 +2612,7 @@ export function makeResidents(loc: any, T: any, fishNames: string[], birdNames: 
       };
       // (the start's action — what to make — falls in the first request only)
       const out = w && tending ? watched() : advance(lab, x.runId, e.step, { realNow: clockMs, environment: (at) => envFor(e, at), energy: e.tend === 'stay' && !tending ? (e.energy ? (f: number, t: number) => e.energy!(f, t).map((o) => ({ ...o, maxJ: 0 })) : undefined) : e.energy,   // (hands taken away: offered, but nothing)
-        actions: [...(e.start ? [{ at: x.startOnClock, action: e.start.action, params: e.start.params }] : []), ...(e.steps ?? []).map((q) => ({ at: x.startOnClock + q.afterMs, action: q.action })), ...(e.finish ? [{ at: x.startOnClock + e.finish.afterMs, action: e.finish.action }] : fo ? feel : reads)], ...(e.gauge ? { maxMs: 3_600_000 } : {}), ...(e.tend === 'stay' && !tending ? { stop: 'operator' as const } : {}) });
+        actions: [...(e.start ? [{ at: x.startOnClock, action: e.start.action, params: e.start.params }] : []), ...(e.steps ?? []).map((q) => ({ at: x.startOnClock + q.afterMs, action: q.action })), ...(e.finish ? [{ at: x.startOnClock + e.finish.afterMs, action: e.finish.action }] : fo ? feel : reads)], ...(e.gauge ? { maxMs: 3_600_000 } : {}), ...((e.tend === 'stay' && !tending) || x.stuck ? { stop: 'operator' as const } : {}) });   // (a weather pot stuck: opened)
       if (tending && lab.runs[x.runId]?.status !== 'running' && lab.runs[x.runId]?.status !== 'starting') by.task!.t = by.task!.dur;   // (its hand work done: it is free)
       if (fo) for (const c of out) for (const o of c.observations ?? []) {
         if (o.channel !== 'touch' || !o.text) continue;
@@ -2623,6 +2630,16 @@ export function makeResidents(loc: any, T: any, fishNames: string[], birdNames: 
         (village.gaugeLog ??= []).push({ at, processId: e.processId, runId: x.runId, ...(o.value !== undefined ? { mark: o.value } : { text: o.text }), airC: w?.air ?? null }); if (village.gaugeLog.length > 400) village.gaugeLog.shift();
         if (o.value !== undefined && by?.id === 'lantern' && e.processId === 'm02x_air_barometer_test') { hypoRead(toReal(e.clock, o.at), o.value, x.runId); hypoRead2(toReal(e.clock, o.at), o.value, x.runId); }
         if (by) { by.diary.push({ at: toReal(e.clock, o.at), text, key: 'study' }); if (by.diary.length > 800) by.diary.shift(); }
+        // (the weather pot stuck: Lantern opens its plug at once — the run stopped at the next turn, its water back on the
+        // shelf — and sets it again at dawn. Said in words: a night that cooled, if it did; the record's air only chooses
+        // the words, as feelOf's. Science, specs/weather-pot-spill.md 2026-11-02: a seed of finding that the heat moves it)
+        if (o.text && !x.stuck && e.processId === WEATHER_POT && POT_STUCK.test(o.text)) {
+          x.stuck = at;
+          const set = [...village.gaugeLog].reverse().find((g) => g.runId === x.runId && g.placed), hr = localHour(at);
+          const cooled = w?.air != null && set?.airC != null && w.air < set.airC - 1, night = hr < 6 || hr >= 18;
+          const what = /空気/.test(o.text) ? `${cooled ? (night ? '冷えた夜に、' : '冷えて、') : ''}壺に空気が入った` : '管の上から水があふれた';
+          by?.diary.push({ at, text: `天気の壺：${what}。栓を開けて、置き直す`, key: 'study' });
+        }
       }
       const ended = out.find((c) => c.ok && ['completed', 'stopped', 'failed'].includes(c.status!));
       if (!ended) continue;
