@@ -238,7 +238,7 @@ export interface Resident {
   // for its body (what the model is told, not the world's facts): how far its feet have gone, how fast it
   // is going, what it is looking at, and which spell of doing something this is and for how long
   mo: { stride: number; px: number; pz: number; ph: number; gait: number; key: number; t: number; act: string; task: Task | null; look: THREE.Vector3 | null; why: string; hold: number; glance: number;
-    probe: number; since: number; fails: number; bad: [number, number][]; poi?: { key: number; a: number }; recheck: number; grazeTry?: { bed: string; at: number; hunger: number }; stuckAt?: number; grazeAvoid?: Record<string, number>;
+    probe: number; since: number; fails: number; bad: [number, number][]; poi?: { key: number; a: number }; recheck: number; grazeTry?: { bed: string; at: number; hunger: number }; stuckAt?: number; shelveTries?: number; grazeAvoid?: Record<string, number>;
     bout?: { patch?: string; tries: number; got: number; weak: number; full: number; opt?: string }; coldAt?: number; roughFelt?: number; walkedAt?: number; backFrom?: [number, number]; lift?: { y: number; at: number; held: boolean } };   // (recheck: back to what it was doing, a look at it first)   // (Lantern: trying the footing ahead, how far since it last did, where it found it would not do)
   lightK?: number;
   resume?: Task; resumeAt?: number;     // what it was in the middle of when someone came up to talk (to go back to after)
@@ -1657,7 +1657,7 @@ export function makeResidents(loc: any, T: any, fishNames: string[], birdNames: 
     const q = Math.random();
     // something strange lying on the beach nearby: go and look
     if (!agentOf(r) && drift.kind >= 0 && !drift.by && !r.holding && Math.hypot(drift.x - r.pos.x, drift.z - r.pos.z) < 60) { drift.by = r.id; return task('find', [drift.x, drift.z], 'pick', 6); }
-    if (!agentOf(r) && r.holding === 'drift') return task('shelve', (() => { const w = shelf.position; return [w.x + 0.6, w.z + 0.6] as [number, number]; })(), 'work', 4);
+    if (!agentOf(r) && r.holding === 'drift') { const t = shelveTask(r); if (t) return t; }
     // Lantern: a process it can run, with its material on the shelf — while it is awake (it works by its own light), hands
     // free (the world runs it)
     if (r.id === 'lantern' && !r.holding && !sleepTime(r, hr) && !village.labRuns.some((x) => x.by === r.id && lab.runs[x.runId]?.status !== 'completed' && catalog.find((c) => c.processId === x.processId)?.tend === 'stay')) {   // (only hand work keeps it: a gauge left reading, wood left a month to season, a pot left to dry do not — life-run 2026-10-09)
@@ -1968,7 +1968,7 @@ export function makeResidents(loc: any, T: any, fishNames: string[], birdNames: 
     else if (action === 'twist') t = task('twist', benchStand(), 'work', rr(60, 90));
     else if (action === 'cut') t = r.holding ? null : cutTask();
     else if (action === 'find') { if (drift.kind < 0 || drift.by) return null; drift.by = r.id; t = task('find', [drift.x, drift.z], 'pick', 6); }
-    else if (action === 'shelve') t = r.holding === 'drift' ? task('shelve', [shelf.position.x + 0.6, shelf.position.z + 0.6], 'work', 4) : null;
+    else if (action === 'shelve') t = shelveTask(r);
     else if (action === 'chop') { const tr = TREES[+target.split('#')[1]]; t = tr && tr.ok && !tr.down ? task('chop', [tr.x + 0.9, tr.z + 0.3], 'chop', rr(40, 70), { data: tr }) : null; }
     else if (action === 'till' || action === 'plant' || action === 'harvest') {
       const pl = PLOTS[+target.split('#')[1]], want = action === 'till' ? 0 : action === 'plant' ? 1 : 2;
@@ -2416,6 +2416,18 @@ export function makeResidents(loc: any, T: any, fishNames: string[], birdNames: 
   }
   /* ---------- Lantern's processes (the science core, run by the world) ---------- */
   const shelfStand = (): [number, number] => { const w = atHut(1.6, -3.2); return [w.x, w.z]; };   // (in front of the shelf, clear of the hut: room for Lantern's wide body)
+  // (a find carried to the shelf: to its stand, where there is room — the corner it went to before was walled in by what
+  // was built by the shelf, and Lantern carried a find for days, its hands full, the pit fire waiting: science,
+  // reviews/201-f18a02d. Three tries that did not get there, and it is set down where it is, kept with the finds all the
+  // same: its hands free)
+  function shelveTask(r: Resident): Task | null {
+    if (r.holding !== 'drift') return null;
+    if ((r.mo.shelveTries = (r.mo.shelveTries ?? 0) + 1) <= 3) return task('shelve', shelfStand(), 'work', 4);
+    const what = drift.kind >= 0 ? DRIFT[drift.kind].ja : '見つけたもの';
+    r.holding = ''; r.mo.shelveTries = 0; village.treasures.push({ what, who: r.v.name, at: clockMs }); drift.kind = -1; drift.t = 0; drawShelf();
+    note(r, 'find', { thing: what }, `${what}を棚まで運べなかったので、その場に置いた`);
+    return null;
+  }
   /** The catalog entry a run or a task meant (two entries can share a process: the pot shaped as a cook pot or a lamp dish). */
   const entryOf = (processId: string, key?: string) => catalog.find((c) => c.processId === processId && (!key || c.key === key)) ?? catalog.find((c) => c.processId === processId);
   /** How many pots of a form are on their way (shaped, drying, fired, not yet made into anything). */
@@ -2917,7 +2929,7 @@ export function makeResidents(loc: any, T: any, fishNames: string[], birdNames: 
         r.today.push(`浜で${DRIFT[drift.kind].ja}を見つけた`); note(r, 'find', { thing: DRIFT[drift.kind].ja }); tell('drift', `${r.v.name}が浜で${DRIFT[drift.kind].ja}を見つけた`, r); return;
       case 'shelve':
         if (r.holding !== 'drift') { tk.failed = 'unavailable'; break; }
-        r.holding = ''; village.treasures.push({ what: DRIFT[drift.kind].ja, who: r.v.name, at: clockMs }); drift.kind = -1; drift.t = 0; drawShelf(); break;
+        r.holding = ''; r.mo.shelveTries = 0; village.treasures.push({ what: DRIFT[drift.kind].ja, who: r.v.name, at: clockMs }); drift.kind = -1; drift.t = 0; drawShelf(); break;
       case 'fetch':
         if (!items.take(tk.data)) break;
         r.holding = tk.data.kind ?? 'stone'; r.task = null; return;   // (decide() takes it on: a stone to the cairn, a coconut to the shelf)
