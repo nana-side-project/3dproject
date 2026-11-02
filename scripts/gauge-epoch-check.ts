@@ -17,6 +17,7 @@ import { mulberry32 } from '../src/core/math';
 import { loadIslandWeather, islandWeather, islandWait } from '../src/world/island-time';
 import { addLot } from '../src/world/process-runner';
 import { recentScienceRuns, readScienceRunSummary } from '../src/world/science-records';
+import { CATALOG } from '../src/world/process-catalog';
 
 let now = Date.parse('2026-10-06T00:00:00Z');
 Date.now = () => now;
@@ -28,7 +29,10 @@ const want = (what: string, ok: boolean, got = '') => { if (!ok) bad++; console.
 await loadIslandWeather();
 Math.random = mulberry32(7);
 const f = () => 2, T: any = { ground: f, floor: f, top: f, landCover: () => ({ can: 0, sand: 1 }), vegH: () => 0, solids: new Solids() };
-const make = () => { const R: any = makeResidents({ id: 'kayama', lat: 24.37, lon: 124.03, f } as any, T, ['テスト魚'], ['テスト鳥']); R.setBrain(null); return R; };
+// (the weather pot set as soon as it can be, at any hour: the setups are this check's, the hour of setting
+// weather-pot-check's — set only at dawn, the island here would be saved and loaded at other hours than it was made for)
+const ANY_HOUR = CATALOG.map((e) => (e.processId === 'm03x_air_barometer_pot' ? { ...e, when: undefined } : e));
+const make = () => { const R: any = makeResidents({ id: 'kayama', lat: 24.37, lon: 124.03, f } as any, T, ['テスト魚'], ['テスト鳥']); R.setBrain(null); R.setCatalog(ANY_HOUR); return R; };
 const stepper = (R: any) => (secs: number, until?: () => boolean) => { for (let i = 0; i < secs; i++) { now += 1000; R.update(1, now, new THREE.Vector3(0, 50, 0)); if (i % 60 === 0) R.setWeather(islandWeather(now)); for (const r of R.list) if (!r.sp.living) { r.battery = 1; r.hunger = 0.2; } if (until?.()) return true; } return false; };
 const M2 = 'm02x_air_barometer_test', M3 = 'm03x_air_barometer_pot', LIVE = ['starting', 'running', 'needs-input'];
 const live = (lab: any, p: string) => Object.values(lab.runs).find((r: any) => r.processId === p && LIVE.includes(r.status)) as any;

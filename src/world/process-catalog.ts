@@ -78,8 +78,8 @@ export interface CatalogEntry {
   key?: string;
   /** The pot's form it shapes (1 cook pot, 3 lamp dish): not made while one of that form is already on its way. */
   form?: number;
-  /** Only at this time of day, on the island's own hours: the lamp is lit at dusk. */
-  when?: 'dusk';
+  /** Only at this time of day, on the island's own hours: the lamp is lit at dusk; the weather pot set at dawn. */
+  when?: 'dusk' | 'dawn';
   /** The lots kept with its equipment go in too (the oil soaked into the lamp dish's wall, held with the dish). */
   withEquipmentLots?: boolean;
 }
@@ -179,6 +179,9 @@ export const CATALOG: CatalogEntry[] = [
     ja: '天気の壺を置いて読む（竹の管の水の高さ）', input: 'process_water', inputJa: '雨水（壺の底に250mL）', minInputMg: WEATHER_POT_WATER_MG,
     equipment: { kind: ASSEMBLED_POT, catalogEntry: ASSEMBLED_POT, catalogVersion: TEST, condition: 1, params: {}, ja: '天気の壺（竹の管を通して封じた壺）' }, built: ASSEMBLED_POT,
     step: barometerPotStep, env: 'record', tend: 'leave', gauge: { action: 'read_gauge', everyMs: 3 * 3_600_000 },
+    // (set at dawn, the coolest of the day: its tube's water has some 2 cm to fall before air gets in at its foot — a pot set
+    // by day let air in on its first night, and read so to the end. Science, specs/weather-pot-spill.md 2026-11-02)
+    when: 'dawn',
     ready: true, waits: '竹の管を通して封じた壺と、雨水' },
   // (integrated 2026-10-06: the science team's final review FINAL_REVIEW_2026-10-06.md — charcoal and wood tar, and the
   // sealed vessel; wood tar comes from the charcoal burn, so they came in together)

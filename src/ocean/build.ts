@@ -32,6 +32,7 @@ import { makeJacks } from '../eco/jacks';
 import type { Sea } from '../data/locations';
 import { Cave } from './cave';
 import { Wreck, wreckMaterial } from './wreck';
+import { buildHorizon } from './horizon';
 import { buildShore, landUniforms, LAND_FLOOR } from './shore';
 import { landOf } from './land';
 import { classifyWaterSteps } from './water';
@@ -510,6 +511,7 @@ export function* buildOceanSteps(loc): Generator<string, any, unknown> {
   }
   yield 'life';
   if (land) oc.shore = buildShore(loc, group, T, obst);
+  if (land) buildHorizon(group);   // (the islands round about, on the horizon: ocean/horizon.ts)
   yield 'life';
   if (loc.residents) {
     const lanternStudy = typeof location !== 'undefined' && new URLSearchParams(location.search).has('lantern-study');
