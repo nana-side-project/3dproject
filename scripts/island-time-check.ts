@@ -3,11 +3,16 @@
 //  2 the weather: the Earth's past record replayed on the island's calendar — a typhoon in the first island summer
 //  3 a typhoon on the island: everyone takes shelter, the evening custom waits; once it passes the beds and the rocky
 //    bottom are torn up, something washes up, and each has it in its record
+//  5 the sea's seasons on the island's calendar (science on #166): what comes by the season — the whales' months, a
+//    manta's day, the day's lot — and the sea's warmth go by the island's month and day in Dot's world; the Earth's
+//    seas keep the Earth's
 // Usage: npx tsx --import ./scripts/node-assets.mjs scripts/island-time-check.ts
 import * as THREE from 'three';
 import { makeResidents } from '../src/robots/residents';
 import { Solids } from '../src/robots/solids';
 import { mulberry32 } from '../src/core/math';
+import { skyState, seaTemp } from '../src/time/clock';
+import { DOTWORLD, LOCATIONS } from '../src/data/locations';
 import { ISLAND_RATE, islandDate, islandWait, islandWeather, loadIslandWeather, type IslandWeather } from '../src/world/island-time';
 
 let bad = 0;
@@ -71,6 +76,18 @@ let typhoonAt = 0;
   want('4 most deep typhoons have a long swell before them', deep >= 3 && ahead * 2 > deep, `${ahead} of ${deep}`);
   let n = 0, th = 0; for (let t = t0; t < t0 + 28 * 86400e3; t += 1800e3) { n++; if (islandWeather(t)!.thunder) th++; }
   want('4 thunder now and then, not often (a typhoon in heavy rain, or a downpour)', th > 0 && th / n < 0.02, `${(th / n * 100).toFixed(2)}% of the time`);
+}
+{ // 5 the sea's seasons on the island's calendar
+  const kayama = LOCATIONS.find((l) => l.id === 'kayama')!, a = skyState(t0, DOTWORLD), e = skyState(t0, kayama);
+  want('5 Dot\'s world: the sea\'s date is the island\'s (June 1st); Kayama on the Earth keeps the Earth\'s (October 5th)', a.month === 6 && a.mday === 1 && e.month === 10 && e.mday === 5, `${a.month}/${a.mday}, ${e.month}/${e.mday}`);
+  let same = true, months = new Set<number>();
+  for (let t = t0; t < t0 + 28 * 24 * H; t += H) { const s = skyState(t, DOTWORLD), d = islandDate(t); if (s.month !== d.month || s.mday !== d.day) same = false; months.add(s.month); }
+  want('5 through an island year, every hour: the island\'s month and day, all twelve months', same && months.size === 12, `${months.size} months`);
+  const t1 = Date.parse('2026-10-19T12:00:00+09:00'), d1 = islandDate(t1), p = DOTWORLD.mantaPass!.p;
+  want('5 a manta\'s day by the island\'s month: mid-October on the Earth is early December on the island (0.35, not 0.5)', p[skyState(t1, DOTWORLD).month - 1] === 0.35 && p[skyState(t1, kayama).month - 1] === 0.5, `${d1.label}`);
+  let warm = t0, hi = -1; for (let t = t0; t < t0 + 28 * 24 * H; t += H) { const c = seaTemp(t, DOTWORLD.lat, DOTWORLD.tempYear!, DOTWORLD.world); if (c > hi) { hi = c; warm = t; } }
+  const w = islandDate(warm);
+  want('5 the sea is warmest in the island\'s late August', w.month === 8 && w.day >= 15, `${w.label} ${hi.toFixed(1)}°C`);
 }
 console.log(bad ? `FAIL (${bad})` : 'PASS');
 process.exit(bad ? 1 : 0);
