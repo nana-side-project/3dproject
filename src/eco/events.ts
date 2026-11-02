@@ -116,7 +116,8 @@ function flowSchool(oc: any, sp: Species, n: number, where: (i: number, t: numbe
 }
 
 // whether today a manta is about this sea (mantaPass): drawn from the sea and the date alone, so a day keeps its answer
-function mantaDay(loc: any, env: Env) {
+// (exported for island-time-check: in Dot's world too, a real day keeps it)
+export function mantaDay(loc: any, env: Pick<Env, 'month' | 'mday'>) {
   const key = `${loc.id}:${env.month}-${env.mday}:manta`;
   let h = 2166136261; for (let i = 0; i < key.length; i++) { h ^= key.charCodeAt(i); h = Math.imul(h, 16777619); }
   return mulberry32(h >>> 0)() < (loc.mantaPass?.p[env.month - 1] ?? 0);

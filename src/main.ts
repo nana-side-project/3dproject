@@ -52,7 +52,7 @@ import { STAGES } from './robots/voices';
 import { aiKey, setAiKey, aiLastError } from './robots/mind';
 import { setAnisotropy, SURFACE, SURF_UNIFORMS } from './render/surface';
 import { TIERS, TIER_ORDER, detectTier, type Tier } from './quality';
-import { soundStream, audio, audioState, startAudio, stopAudio, pauseAudio, setShore, setHum, setMotor, crunch, setWhaleSong, setMood, setMusic, setRain, setWind, setSea, thunder, splash, breachSound, breachRise, renderLeap, setAir, frenzy, plop, blow, vol, setVolume, babble, lumauVoice, voices, setVoices } from './audio';
+import { cue, speaking, soundStream, audio, audioState, startAudio, stopAudio, pauseAudio, setShore, setHum, setMotor, crunch, setWhaleSong, setMood, setMusic, setRain, setWind, setSea, thunder, splash, breachSound, breachRise, renderLeap, setAir, frenzy, plop, blow, vol, setVolume, babble, lumauVoice, voices, setVoices } from './audio';
 import { makePov } from './ui/pov';
 import { makeDiaryBook } from './ui/diary';
 import { makeLanternStudyPanel } from './ui/lantern-study';
@@ -1861,7 +1861,7 @@ function updateHud() {
   $('tDepth').textContent = (up ? overSea(drone.pos) : depth).toFixed(1);
   $('tAlt').textContent = loc.pelagic ? (4800 + drone.pos.y).toFixed(0) : alt.toFixed(1);   // the real bottom, 4.8 km down
   $('tSpd').textContent = drone.vel.length().toFixed(2);
-  $('tTemp').textContent = ((liveWeather().sst ?? (loc.tempYear ? seaTemp(clock.ms, loc.lat, loc.tempYear) : loc.temp)) - depth * 0.04 + Math.sin(U.uTime.value * 0.05) * 0.05).toFixed(1);
+  $('tTemp').textContent = ((liveWeather().sst ?? (loc.tempYear ? seaTemp(clock.ms, loc.lat, loc.tempYear, loc.world) : loc.temp)) - depth * 0.04 + Math.sin(U.uTime.value * 0.05) * 0.05).toFixed(1);
   $('tVis').textContent = (3 / (U.uFogDen.value * (1 + 0.15 * s.night)) * 0.3).toFixed(0);
   $('tTide').textContent = (s.tideH >= 0 ? '+' : '') + s.tideH.toFixed(1);
   $('tTideDir').textContent = Math.abs(s.tideRate) < 0.000015 ? (s.tideH > 0 ? '満潮' : '干潮') : s.tideRate > 0 ? '上げ潮' : '下げ潮';
@@ -3822,7 +3822,8 @@ updateGlobeTimes();
 requestAnimationFrame(frame);
 if (live && (!location.hash || location.hash === '#')) history.replaceState(null, '', location.pathname + location.search + '#planet');   // (the stream is the island)
 if (live) import('./live/live').then((m) => { liveUi = m.makeLive({ residents: () => (mode === 'ocean' ? cur?.residents ?? null : null), watched: () => fleet.bridge?.to ?? watch.r, watch: (r) => fleetCut(r), clockMs: () => clock.ms, tz: () => cur?.loc.tz ?? 9, cam: (who, pri, kind, why) => rehearsal?.cam(who, pri, kind, why),
-  visible: (r) => fleetSees(r), skip: (who, pri, why) => rehearsal?.event('cam-skip', `${DORON[who] ?? '13'} ${who} ${why}`, false), bridging: () => !!fleet.bridge }); });
+  visible: (r) => fleetSees(r), skip: (who, pri, why) => rehearsal?.event('cam-skip', `${DORON[who] ?? '13'} ${who} ${why}`, false), bridging: () => !!fleet.bridge,
+  cue: (c) => cue(c), speaking: () => speaking(), cueLog: (c, sounded, why) => rehearsal?.event('cue', sounded ? c : `${c}（鳴らさず：${why}）`, sounded) }); });
 const start = seaForHash(location.hash, LOCATIONS, DOTWORLD);
 let restoreStartup = true;
 const hashNavigation = createHashNavigation<Sea>({
