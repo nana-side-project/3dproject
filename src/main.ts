@@ -50,7 +50,7 @@ import { STAGES } from './robots/voices';
 import { aiKey, setAiKey, aiLastError } from './robots/mind';
 import { setAnisotropy, SURFACE, SURF_UNIFORMS } from './render/surface';
 import { TIERS, TIER_ORDER, detectTier, type Tier } from './quality';
-import { soundStream, audio, audioState, startAudio, stopAudio, pauseAudio, setShore, setHum, setMotor, crunch, setWhaleSong, setMood, setMusic, setRain, setWind, setSea, thunder, splash, breachSound, breachRise, renderLeap, setAir, frenzy, plop, blow, vol, setVolume, babble, lumauVoice, voices, setVoices } from './audio';
+import { cue, speaking, soundStream, audio, audioState, startAudio, stopAudio, pauseAudio, setShore, setHum, setMotor, crunch, setWhaleSong, setMood, setMusic, setRain, setWind, setSea, thunder, splash, breachSound, breachRise, renderLeap, setAir, frenzy, plop, blow, vol, setVolume, babble, lumauVoice, voices, setVoices } from './audio';
 import { makePov } from './ui/pov';
 import { makeDiaryBook } from './ui/diary';
 import { makeLanternStudyPanel } from './ui/lantern-study';
@@ -3780,7 +3780,8 @@ resize();
 updateGlobeTimes();
 requestAnimationFrame(frame);
 if (live && (!location.hash || location.hash === '#')) history.replaceState(null, '', location.pathname + location.search + '#planet');   // (the stream is the island)
-if (live) import('./live/live').then((m) => { liveUi = m.makeLive({ residents: () => (mode === 'ocean' ? cur?.residents ?? null : null), watched: () => watch.r, watch: (r) => startWatch(r), clockMs: () => clock.ms, tz: () => cur?.loc.tz ?? 9, cam: (who, pri, kind, why) => rehearsal?.cam(who, pri, kind, why) }); });
+if (live) import('./live/live').then((m) => { liveUi = m.makeLive({ residents: () => (mode === 'ocean' ? cur?.residents ?? null : null), watched: () => watch.r, watch: (r) => startWatch(r), clockMs: () => clock.ms, tz: () => cur?.loc.tz ?? 9, cam: (who, pri, kind, why) => rehearsal?.cam(who, pri, kind, why),
+  cue: (c) => cue(c), speaking: () => speaking(), cueLog: (c, sounded, why) => rehearsal?.event('cue', sounded ? c : `${c}（鳴らさず：${why}）`, sounded) }); });
 const start = seaForHash(location.hash, LOCATIONS, DOTWORLD);
 let restoreStartup = true;
 const hashNavigation = createHashNavigation<Sea>({

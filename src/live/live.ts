@@ -23,6 +23,7 @@ import { makeDirector } from './director';
 import { chapter1 } from '../world/chapter1';
 import { chapter2 } from '../world/chapter2';
 import { chapterView, startCard, endCard, goneCard, chapter2View, startCard2, endCard2, chapterShown } from './chapter-line';
+import { makeCues, trialCue, gatherCue, type Cue } from './cues';
 
 export interface LiveCtx {
   residents(): any | null;           // the island's residents, once the island is built
@@ -31,6 +32,9 @@ export interface LiveCtx {
   clockMs(): number;
   tz(): number;
   cam?(who: string, pri: number, kind: string, why: string): void;   // (each change of who is followed, for the log: ?rehearsal)
+  cue?(c: Cue): void;                // a notification sound (audio.ts cue; PROGRAM.md §5-3)
+  speaking?(): boolean;              // a resident's voice sounding now (a notification sound waits for it to end)
+  cueLog?(c: Cue, sounded: boolean, why: string): void;   // (each sounded or let go, for the log: ?rehearsal)
 }
 /** The drone's number for each one it follows (01–04; 13 is the island round, later). */
 const DORON: Record<string, string> = { dot: '01', rakko: '02', kame: '03', lantern: '04' };
@@ -220,11 +224,22 @@ export function makeLive(ctx: LiveCtx) {
   // (its start and end) take the same place with their own heading.
   const card = $('.card'), queue: { head?: string; text: string; at: number; shown?: () => void }[] = [];
   let cardT = 0;
+  // The notification sounds (PROGRAM.md §5-3, src/live/cues.ts): a card's three notes as it shows; a try's as it is decided
+  // or comes out (words on the screen only); the gatherings' knocks, from the island's clock. On the viewer's own time:
+  // one every three minutes at most, the card's excepted.
+  const cues = makeCues((c) => ctx.cue?.(c), () => ctx.speaking?.() ?? false, (c, sounded, why) => ctx.cueLog?.(c, sounded, why));
+  let cueHr = -1;
+  function cueTick() {
+    const R = ctx.residents(), hr = ((ctx.clockMs() / 3.6e6 + ctx.tz()) % 24 + 24) % 24, now = performance.now();
+    if (cueHr >= 0 && R?.meets && R.meetAt) { const g = gatherCue(cueHr, hr, R.meetAt, R.meets); if (g) cues.want(g, now); }
+    cueHr = hr; cues.tick(now);
+  }
   function event(kind: string, text: string, r: any, meta?: { milestone?: string; trial?: { kind: string; result?: string; text: string | null } }) {
     director.event(kind, text, r, meta);   // (ranked for the drone)
     // (a trial begun or come out, with words to show: rank 1 — not its steps taken with nothing to check, which may be many:
     // on one already followed, only the heading changes, PROGRAM.md §4)
     if (meta?.trial?.text && meta.trial.result !== 'steps-done') director.trial(r, meta.trial.result ?? 'start', meta.trial.text);
+    { const c = en ? null : trialCue(meta?.trial); if (c) cues.want(c, performance.now()); }   // (no words on the English screen yet: no sound for them)
     if (!meta?.milestone) return;
     const ja = trimStatus(text.split('。')[0]), esc1 = (t: string) => t.replace(/[<&]/g, (c) => (c === '<' ? '&lt;' : '&amp;'));
     const html = en ? firstEn(meta.milestone, r?.v?.name ?? '', true) : esc1(ja);
@@ -239,10 +254,10 @@ export function makeLive(ctx: LiveCtx) {
     $('.card .head').textContent = m.head ?? (en ? FIXED_EN.first : '島で初めて');
     $('.card .what').innerHTML = m.text;   // (escaped as it was made: only an island's word in italics)
     $('.card .at').innerHTML = `${esc(dateOf(m.at))} <span class="t">${localTimeString(m.at, ctx.tz())}</span>`;
-    card.classList.remove('off'); cardT = 8; m.shown?.();
+    card.classList.remove('off'); cardT = 8; m.shown?.(); cues.want('first', performance.now());
   }
 
   /** A try's result, for the trials' screen (PROGRAM.md §1): the drone goes to the one whose try it was (rank 1). */
   const trial = (r: any, outcome: string, text: string) => director.trial(r, outcome, text);
-  return { update: (dt: number) => { update(dt); cardTick(dt); }, sample, haze, event, trial };
+  return { update: (dt: number) => { update(dt); cardTick(dt); cueTick(); }, sample, haze, event, trial };
 }

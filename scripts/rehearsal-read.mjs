@@ -19,7 +19,7 @@ const rows = readFileSync(file, 'utf8').split('\n').filter(Boolean).flatMap((l) 
 const minOf = (r) => r.jst.slice(0, 16);   // (YYYY-MM-DDTHH:MM, in Japan)
 const step = (m) => new Date(Date.parse(m + ':00+09:00') + 60e3 + 9 * 3600e3).toISOString().slice(0, 16);
 const alive = new Set(), strong = new Set(), weak = new Set(), n = { sub: 0, card: 0, shown: 0, status: 0, blank: 0, hidden: 0, error: 0 };
-const trials = { start: 0, shown: 0, result: {}, blank: 0 }, sound = {}, ai = { calls: 0, ok: 0, why: {}, models: {} }, slow = { n: 0, hidden: 0, parts: {} };
+const trials = { start: 0, shown: 0, result: {}, blank: 0 }, sound = {}, cues = { sounded: {}, letGo: {}, hours: {} }, ai = { calls: 0, ok: 0, why: {}, models: {} }, slow = { n: 0, hidden: 0, parts: {} };
 let first = '', last = '';
 for (const r of rows) {
   if (!r.jst) continue;
@@ -27,6 +27,10 @@ for (const r of rows) {
   if (!first || m < first) first = m; if (m > last) last = m; alive.add(m);   // (a minute the app ran in: it writes a row each second)
   if (r.t === 'sub') { n.sub++; strong.add(m); }
   else if (r.t === 'card') { n.card++; strong.add(m); }
+  else if (r.t === 'event' && r.kind === 'cue') {   // (the notification sounds, PROGRAM.md §5-3: each sounded, or let go and why)
+    const [c, why] = String(r.text).split('（鳴らさず：'); const k = r.shown ? 'sounded' : 'letGo', w = r.shown ? c : (why ?? '').replace(/）$/, '');
+    cues[k][w] = (cues[k][w] ?? 0) + 1; if (r.shown && c !== 'first') cues.hours[m.slice(0, 13)] = (cues.hours[m.slice(0, 13)] ?? 0) + 1;
+  }
   else if (r.t === 'event' && r.shown === true) n.shown++;
   else if (r.t === 'status') { n.status++; if (!r.text) n.blank++; weak.add(m); }
   else if (r.t === 'audio') sound[r.state] = (sound[r.state] ?? 0) + 1;
@@ -55,6 +59,8 @@ console.log(`minutes with either (or the status line changing):      ${pct(mins.
 console.log(`longest run with no strong one: ${best} min${best ? ` (${bestFrom.slice(11)}–${bestAt.slice(11)})` : ''}`);
 console.log(`counts: subtitles ${n.sub}, cards ${n.card}, status changes ${n.status} (to blank ${n.blank}); the day's log (not on the live screen) ${n.shown}; tab hidden ${n.hidden}, errors ${n.error}`);
 console.log(`sound (a row a minute): ${Object.keys(sound).length ? Object.entries(sound).map(([k, v]) => `${k} ${v} min`).join(', ') : 'not written (a log from before it was)'}`);
+{ const sum = (o) => Object.values(o).reduce((a, b) => a + b, 0), list = (o) => Object.entries(o).map(([k, v]) => `${k} ${v}`).join(', '), most = Math.max(0, ...Object.values(cues.hours));
+  console.log(`notification sounds: sounded ${sum(cues.sounded)}${sum(cues.sounded) ? ` (${list(cues.sounded)})` : ''}; let go ${sum(cues.letGo)}${sum(cues.letGo) ? ` (${list(cues.letGo)})` : ''}; most in an hour, the cards' aside: ${most}`); }
 console.log(`trials begun: ${trials.start} (with words fit to show ${trials.shown}); results: ${Object.entries(trials.result).map(([k, v]) => `${k} ${v}`).join(', ') || '—'} (with no words to show ${trials.blank})`);
 console.log('hour by hour (strong / either):');
 const hours = [...new Set(mins.map((m) => m.slice(0, 13)))];

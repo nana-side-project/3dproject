@@ -703,3 +703,61 @@ export function babble(who: string, text: string, vol: number, pan = 0) {
     t += 1 / v.rate;
   });
 }
+
+// ---------- the notification sounds (viewer design PROGRAM.md §5-3; when: src/live/cues.ts) ----------
+// The same sound for the same kind of moment. A wooden bar's notes for a try — two rising and bright when it held, two
+// falling and low when it did not, one soft when it is decided; three clear notes of a glass bell, some three seconds,
+// with a card (a first on the island, a chapter); two knocks of wood as a gathering begins, one small five minutes
+// before. Some 3 dB under the voices (§5-1), measured rendered offline: a resident's line near the drone comes to about
+// −27.5 dB over its loudest 0.4 s, the two notes and the bell's three to about −30.5; the soft note and the knocks under
+// that (a knock is short: its top near −19 dB). Rounded onsets, and nothing sharp — the master's low-pass takes the top off.
+let cueBus: GainNode | null = null;
+/** Whether a resident's voice is sounding now (a notification sound waits for it to end). */
+export const speaking = () => Object.keys(lumauNow).length > 0;
+export type CueKind = 'first' | 'good' | 'bad' | 'decided' | 'gather' | 'gather-soon';
+export function cue(kind: CueKind) {
+  if (!ac || !audio.on) return;
+  if (!cueBus) { cueBus = ac.createGain(); cueBus.gain.value = 1; cueBus.connect(master); const send = ac.createGain(); send.gain.value = 0.3; cueBus.connect(send).connect(reverb); }
+  cueInto(ac, cueBus, kind, ac.currentTime + 0.03);
+}
+/** A notification sound made into a context's node from t0 (the app's; or, for a check, an offline one to measure it by). */
+export function cueInto(a: BaseAudioContext, out: AudioNode, kind: CueKind, t0: number) {
+  // a wooden bar: its note and the bar's fourth partial (a marimba's), soft at the start, the partial gone first
+  const bar = (f: number, at: number, peak: number) => {
+    for (const [k, amp, tau] of [[1, 1, 0.32], [3.9, 0.22, 0.07]] as const) {
+      const o = a.createOscillator(); o.type = 'sine'; o.frequency.value = f * k;
+      const g = a.createGain(); g.gain.setValueAtTime(0.0001, at); g.gain.exponentialRampToValueAtTime(peak * amp, at + 0.008);
+      g.gain.setTargetAtTime(0.0001, at + 0.008, tau);
+      o.connect(g).connect(out); o.start(at); o.stop(at + tau * 8 + 0.05);
+    }
+  };
+  // a glass bell: its note and two partials not quite in tune with it, ringing on
+  const bell = (f: number, at: number, peak: number) => {
+    for (const [k, amp, tau] of [[1, 1, 0.9], [2.32, 0.28, 0.45], [4.1, 0.08, 0.2]] as const) {
+      const o = a.createOscillator(); o.type = 'sine'; o.frequency.value = f * k;
+      const g = a.createGain(); g.gain.setValueAtTime(0.0001, at); g.gain.exponentialRampToValueAtTime(peak * amp, at + 0.012);
+      g.gain.setTargetAtTime(0.0001, at + 0.012, tau);
+      o.connect(g).connect(out); o.start(at); o.stop(at + tau * 7 + 0.05);
+    }
+  };
+  // a knock of wood: a short hollow note and a breath of noise through a narrow band
+  const knock = (at: number, peak: number) => {
+    const o = a.createOscillator(); o.type = 'sine'; o.frequency.setValueAtTime(520, at); o.frequency.exponentialRampToValueAtTime(430, at + 0.08);
+    const g = a.createGain(); g.gain.setValueAtTime(0.0001, at); g.gain.exponentialRampToValueAtTime(peak, at + 0.004); g.gain.setTargetAtTime(0.0001, at + 0.004, 0.035);
+    o.connect(g).connect(out); o.start(at); o.stop(at + 0.3);
+    const len = Math.floor(a.sampleRate * 0.06), b = a.createBuffer(1, len, a.sampleRate), d = b.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.exp(-i / a.sampleRate * 70);
+    const s = a.createBufferSource(); s.buffer = b;
+    const bp = a.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1100; bp.Q.value = 3;
+    const ng = a.createGain(); ng.gain.value = peak * 0.6;
+    s.connect(bp).connect(ng).connect(out); s.start(at);
+  };
+  switch (kind) {
+    case 'good': bar(659.3, t0, 0.05); bar(880, t0 + 0.16, 0.05); break;          // E5, A5: up
+    case 'bad': bar(392, t0, 0.053); bar(329.6, t0 + 0.2, 0.05); break;           // G4, E4: down, lower
+    case 'decided': bar(523.3, t0, 0.05); break;                                  // C5, soft
+    case 'first': bell(784, t0, 0.036); bell(987.8, t0 + 0.22, 0.033); bell(1174.7, t0 + 0.44, 0.033); break;   // G5 B5 D6
+    case 'gather': knock(t0, 0.105); knock(t0 + 0.24, 0.095); break;
+    case 'gather-soon': knock(t0, 0.055); break;
+  }
+}
