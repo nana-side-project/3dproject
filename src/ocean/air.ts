@@ -229,6 +229,7 @@ const starMat = mat(
      vC = mix(vec3(0.68, 0.8, 1.0), vec3(1.0, 0.72, 0.45), smoothstep(-0.1, 1.5, aBV));
      gl_PointSize = uDpr * clamp(1.9 + (4.5 - aMag) * 0.65, 1.6, 6.0);
      gl_Position = projectionMatrix * viewMatrix * vec4(uCamPos + d * 380.0, 1.0);
+     gl_Position.z = gl_Position.w;   // (at the very back: behind the islands on the horizon, ocean/horizon.ts)
      if (vA < 0.003) gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
    }`,
   `varying vec3 vC; varying float vA;
