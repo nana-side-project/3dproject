@@ -291,6 +291,14 @@ const rr = (a: number, b: number) => a + Math.random() * (b - a);
 const fill = (s: string, vars: Record<string, string | number>) => s.replace(/\{(\w+)\}/g, (_, k) => String(vars[k] ?? ''));
 const smooth01 = (a: number, b: number, x: number) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 const localHour = (ms: number) => (((ms / 3.6e6 + 9) % 24) + 24) % 24;
+/** What a resident says of its weather pot stuck: air let in (in) or its water over the top (over). "A night that cooled"
+ *  only when it cooled more (°C since it was set) than the air's weight rose (hPa) — about a centimetre of the tube's
+ *  water each — so it is the cold that let the air in (science on #214). Words only: the numbers choose them. */
+export function potStuckWords(how: 'in' | 'over', cooledC: number, roseHPa: number, night: boolean): string {
+  if (how === 'over') return '管の上から水があふれた';
+  const cold = cooledC > 0 && cooledC > roseHPa;
+  return `${cold ? (night ? '冷えた夜に、' : '冷えて、') : ''}壺に空気が入った`;
+}
 /** Its day on the island (Asia/Tokyo), YYYY-MM-DD. */
 export const dayOf = (ms: number) => new Date(ms + 9 * 3.6e6).toISOString().slice(0, 10);
 const photosOn = (r: { photos?: PhotoRecord[] }, day: string) => (r.photos ?? []).filter((p) => p.day === day);
@@ -2481,7 +2489,8 @@ export function makeResidents(loc: any, T: any, fishNames: string[], birdNames: 
       if (entry.when === 'dusk') { const hr = localHour(clockMs); if (hr < 18.3 || hr > 20.5) return []; }
       // (the weather pot at dawn, the coolest of the day: what is to come warms it, its tube's water rises — science,
       // specs/weather-pot-spill.md)
-      if (entry.when === 'dawn') { const hr = localHour(clockMs); if (hr < 4.5 || hr > 7.5) return []; }
+      // (not while a typhoon is on: what it would read is a storm's, and it would only spill over — science on #214)
+      if (entry.when === 'dawn') { const hr = localHour(clockMs); if (hr < 4.5 || hr > 7.5 || storm()) return []; }
       // (the oil soaked into the dish's wall goes in with the dish: it is the dish's, kept where the dish is)
       // (the lamp's wick: one of a fibre not yet tried first, then the one that gave the most light)
       if (entry.equipment?.kind === LAMP_DISH_ASSEMBLY.kind) { const k = (entry.also ?? []).findIndex((a) => a.input === 'lamp_wick'), ws = shelfLots().filter((l) => l.materialId === 'lamp_wick' && !(l as any).reservedBy);
@@ -2636,8 +2645,8 @@ export function makeResidents(loc: any, T: any, fishNames: string[], birdNames: 
         if (o.text && !x.stuck && e.processId === WEATHER_POT && POT_STUCK.test(o.text)) {
           x.stuck = at;
           const set = [...village.gaugeLog].reverse().find((g) => g.runId === x.runId && g.placed), hr = localHour(at);
-          const cooled = w?.air != null && set?.airC != null && w.air < set.airC - 1, night = hr < 6 || hr >= 18;
-          const what = /空気/.test(o.text) ? `${cooled ? (night ? '冷えた夜に、' : '冷えて、') : ''}壺に空気が入った` : '管の上から水があふれた';
+          const dT = w?.air != null && set?.airC != null ? set.airC - w.air : 0, p0 = set?.placed?.pressureHPa, p1 = w?.pressureMeasured;
+          const what = potStuckWords(/空気/.test(o.text) ? 'in' : 'over', dT, p0 != null && p1 != null ? p1 - p0 : 0, hr < 6 || hr >= 18);
           by?.diary.push({ at, text: `天気の壺：${what}。栓を開けて、置き直す`, key: 'study' });
         }
       }

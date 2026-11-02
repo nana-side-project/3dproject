@@ -5,16 +5,18 @@
 //   2 its reading stuck (air let in at the tube's foot): opens it at once — the run stopped, its water back on the shelf,
 //     none lost — and says so in words (a night that cooled, if it did), never a number
 //   3 sets it again at the next dawn: a new setup, its record naming the one before
+//   4 the words: "a night that cooled" only when it cooled more (°C) than the air's weight rose (hPa) (science on #214)
+//   5 not set while a typhoon is on, dawn or not (science on #214); once it has passed, at dawn again
 // (the reading stuck is the science side's own words, put in the step's result here: when it comes is the science
 // side's to say — its fix of the pot's first state is its own)
 // Usage: npx tsx --import ./scripts/node-assets.mjs scripts/weather-pot-check.ts
 import * as THREE from 'three';
-import { makeResidents } from '../src/robots/residents';
+import { makeResidents, potStuckWords } from '../src/robots/residents';
 import { Solids } from '../src/robots/solids';
 import { mulberry32 } from '../src/core/math';
 import { addLot, assemble } from '../src/world/process-runner';
 import { CATALOG, POT_ASSEMBLY } from '../src/world/process-catalog';
-import { loadIslandWeather } from '../src/world/island-time';
+import { loadIslandWeather, islandWeather } from '../src/world/island-time';
 
 let now = Date.parse('2026-10-06T03:00:00+09:00');   // (Lantern is up; dawn is an hour and a half away)
 Date.now = () => now;
@@ -76,6 +78,20 @@ let firstRun = '';
   const p = placed()[1], h = p ? hourOf(p.at) : NaN;
   want('3 set again at the next dawn: a new setup, its record naming the one before', !!p && h >= 4.5 && h <= 7.5 && p.placed.from === firstRun && p.runId !== firstRun && lantern.diary.some((e: any) => /置き直した/.test(e.text)),
     `set at ${h.toFixed(2)} h, from ${p?.placed.from}, why ${p?.placed.why}`);
+}
+{ // 5
+  stickAt = now; run(4 * 3600, () => !potRun());
+  const n = placed().length, storm = () => R.setWeather({ ...islandWeather(now)!, typhoon: true });
+  storm(); const at = now; run(30 * 3600, () => { if ((now - at) % 60_000 === 0) storm(); return placed().length > n; });
+  const during = placed().length > n;
+  run(60); const offered = R.labReady().includes(POT);
+  R.setWeather(islandWeather(now)); run(30 * 3600, () => placed().length > n);
+  const p = placed()[n], h = p ? hourOf(p.at) : NaN;
+  want('5 not set while a typhoon is on, dawn or not; once it has passed, at dawn again', !!potRun() && !during && !offered && !!p && h >= 4.5 && h <= 7.5, `in the typhoon: set ${during}, offered ${offered}; after: set at ${h.toFixed(2)} h`);
+}
+{ // 4
+  const w = [potStuckWords('in', 3, 1, true), potStuckWords('in', 3, 1, false), potStuckWords('in', 1, 2.5, true), potStuckWords('in', 2, -3, true), potStuckWords('in', -1, 3, true), potStuckWords('over', 3, 0, true)];
+  want('4 the words: cooled more than the air rose — a night that cooled; else only that air got in', JSON.stringify(w) === JSON.stringify(['冷えた夜に、壺に空気が入った', '冷えて、壺に空気が入った', '壺に空気が入った', '冷えた夜に、壺に空気が入った', '壺に空気が入った', '管の上から水があふれた']), w.join(' / '));
 }
 console.log(bad ? `FAIL (${bad})` : 'all ok');
 process.exit(bad ? 1 : 0);
