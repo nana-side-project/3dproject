@@ -444,8 +444,9 @@ export const LOCATIONS: Sea[] = [
     ]),
     animals: { turtle: { style: 'green', count: 2 }, octopus: 1 },
     // (R-031, the owner's choice 2026-10-27: a manta of the Yonara channel close by passes along the reef's outer side
-    // now and then — most in May to October; February to April, at times two or three in a line, courting)
-    mantaPass: { p: [0.15, 0.3, 0.3, 0.3, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.15, 0.15], line: [2, 3, 4] },
+    // now and then — most in May to October; February to April, at times two or three in a line, courting. November to
+    // January 0.35: the Yonara divers' 50 % against 70 % May-October, at the same ratio as 0.5 to it — science, R-031)
+    mantaPass: { p: [0.35, 0.3, 0.3, 0.3, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.35, 0.35], line: [2, 3, 4] },
     extraGuide: [
       { id: 'turtle', ja: 'アオウミガメ', sci: 'Chelonia mydas', note: '八重山のラグーンでは、海草や藻を食べに浅場へ入ってくる。' },
       { id: 'manta', ja: 'ナンヨウマンタ', sci: 'Mobula alfredi', note: '翼幅3〜5m。ふだんは小浜島と西表島の間のヨナラ水道にいて、ときどき礁の外側を通っていく。多いのは5〜10月。2〜4月には、メスを追うオスが2〜3枚の列になることもある。' },
