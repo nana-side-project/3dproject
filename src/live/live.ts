@@ -31,6 +31,9 @@ export interface LiveCtx {
   clockMs(): number;
   tz(): number;
   cam?(who: string, pri: number, kind: string, why: string): void;   // (each change of who is followed, for the log: ?rehearsal)
+  visible?(r: any): boolean;         // (the drone fleet, ADR 0010: its camera sees it — src/live/fleet.ts)
+  skip?(who: string, pri: number, why: string): void;   // (one passed over, its camera not seeing it: for the log)
+  bridging?(): boolean;              // (the sky between two places, 3–5 s: no band on it — MULTICAM.md §3-1)
 }
 /** The drone's number for each one it follows (01–04; 13 is the island round, later). */
 const DORON: Record<string, string> = { dot: '01', rakko: '02', kame: '03', lantern: '04' };
@@ -87,7 +90,7 @@ export function makeLive(ctx: LiveCtx) {
   function subtitle(R: any, r: any) {
     const sp = r ? speaker(R, r) : null, key = sp ? `${sp.id}|${sp.saying}` : '';
     if (key === subKey) return; subKey = key;
-    if (!sp) { sub.classList.add('off'); if (r) band.classList.remove('off'); return; }
+    if (!sp) { sub.classList.add('off'); if (r && !ctx.bridging?.()) band.classList.remove('off'); return; }
     const said = en ? sp.sayEn ?? '' : sp.saying;   // (in English, its own English line: none, and only the island's letters show)
     const cap = capEn ? sp.sayEn ?? '' : sp.saying;
     if (cap) captions.send(`${nameIn(sp, capEn)}: ${cap}`, ctx.clockMs());
@@ -102,18 +105,20 @@ export function makeLive(ctx: LiveCtx) {
     if (sub.classList.contains('off')) fill(); else { sub.classList.add('off'); setTimeout(() => { if (subKey === key) fill(); }, 600); }
   }
 
-  const director = makeDirector({ residents: ctx.residents, watched: ctx.watched, watch: ctx.watch, cam: ctx.cam, speaking: () => !!subKey });
+  const director = makeDirector({ residents: ctx.residents, watched: ctx.watched, watch: ctx.watch, cam: ctx.cam, speaking: () => !!subKey, visible: ctx.visible, skip: ctx.skip });
   function update(dt: number) {
     const R = ctx.residents();
     if (!R) return;
     director.tick(dt);   // (whom the drone follows: director.ts)
     const r = ctx.watched();
     subtitle(R, r);   // (every frame: a line begins and ends with the voice)
+    // (the sky between two places: no band on it; the next one's band comes in after it, as for another one followed)
+    if (ctx.bridging?.()) { band.classList.add('off'); shownFor = ''; }
     if ((tick -= dt) > 0) return; tick = 1;   // (the words read once a second)
     $('.when .date').textContent = dateOf(ctx.clockMs());
     $('.when .time').textContent = localTimeString(ctx.clockMs(), ctx.tz());
     chapterLine(R);
-    if (!r) { band.classList.add('off'); return; }
+    if (!r || ctx.bridging?.()) { band.classList.add('off'); return; }
     trialLine(r);
     const text = trimStatus(R.status(r) as string);   // (as it is shown: the metres still to go taken out, or the line would fade out and back with the same words each time they change — science, #121)
     if (r.id !== shownFor) {   // (another one followed: the band fades out, changes, fades in)

@@ -12,10 +12,18 @@ export function sightRange(oc: any) {
   return clamp(Math.log(10) / fog, 60, 160);
 }
 
+// (the live screen's cut — ADR 0010, the drone fleet: for two seconds after it, nothing counts as out of sight, so nothing
+// is put down or taken away anywhere — what was behind the camera before the cut may be before it now; science on #206)
+let holdUntil = 0;
+const nowMs = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
+/** After a cut: for ms, nothing is unseen. */
+export function holdUnseen(ms: number) { holdUntil = Math.max(holdUntil, nowMs() + ms); }
+
 /** Whether something of radius r at (x, y, z) cannot be seen from the camera looking along (fx, fz):
  *  beyond sight, or not close by and well off to the side or behind — more than 75° off the way it looks
  *  (the widest view, a phone on its side, shows 50° either side; the rest is room for the camera turning). */
 export function unseen(oc: any, x: number, y: number, z: number, cam: { x: number; y: number; z: number }, fx: number, fz: number, r = 0) {
+  if (holdUntil > 0 && nowMs() < holdUntil) return false;
   const dx = x - cam.x, dy = y - cam.y, dz = z - cam.z, d = hyp(dx, dy, dz);
   if (d - r > sightRange(oc)) return true;
   if (d - r <= 22) return false;
