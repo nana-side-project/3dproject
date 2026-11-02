@@ -83,8 +83,9 @@ const horizonMat = () => mat(
 
 /** Builds the islands round about once their data has come (an island's sea only: those with real land), into group. */
 export function buildHorizon(group: THREE.Group) {
-  if (typeof document === 'undefined') return;   // (headless: nothing to see)
-  const base = `${import.meta.env.BASE_URL}land/horizon`;
+  const env = (import.meta as any).env;
+  if (!env || typeof document === 'undefined') return;   // (headless, outside the app's build: nothing to see)
+  const base = `${env.BASE_URL}land/horizon`;
   fetch(`${base}.json`).then((r) => r.json()).then(async (meta: Record<string, any>) => {
     const grids = await Promise.all(['far', 'near'].filter((n) => meta[n]).map(async (name) => {
       const [H, C] = await Promise.all([pixels(`${base}_${name}_h.png`), pixels(`${base}_${name}_c.png`)]);
