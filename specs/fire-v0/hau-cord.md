@@ -34,3 +34,23 @@
 - Hōkūleʻa 舟づくりの植物：https://archive.hokulea.com/buildplants.html
 - ビショップ博物館 hau：https://data.bishopmuseum.org/ethnobotanydb/ethnobotany.php?ID=hau&b=d
 - PROTA：https://uses.plantnet-project.org/en/Hibiscus_tiliaceus_(PROTA)
+
+## 本体の形（11/02）と、入るときの値の表（科学班の用意、すべて assumed）
+本体の形：3 段（はぐ／浸す／こそげて乾かす）、lot の質に `fiber`（bark・coir）と `soakWater`（sea・fresh）、使い分けの決まりは住人に渡さない。
+
+| id（案） | 値 | 意味 | 印 |
+|---|---|---|---|
+| `hauPeelFreshH` | 島の時計で 24 時間 | 切ってからこの間は、皮がはぎやすい。過ぎると、はげる量が下がる | assumed |
+| `hauPeelLateYield` | 0.5 | 乾いた枝からはげる割合（生の枝を 1 として） | assumed |
+| `hauBarkPerBranchMg` | 生の樹皮 150〜300 g（若い枝 1 本：長さ 2 m、太さ 3〜4 cm） | はいだ量 | assumed |
+| `hauFiberOfBark` | 0.2 | 生の樹皮から、乾いた繊維になる割合（→ 枝 1 本で 30〜60 g） | assumed |
+| `hauSoakMinD`・`hauSoakMaxD` | 島の時計で 7 日・14 日 | これより短いと外の皮が残る（こそげにくく、繊維が少ない）。長いと繊維が弱りはじめる | assumed（日数の資料なし） |
+| `hauOverSoakLoss` | 14 日を過ぎて 1 島日ごとに強さ −3 % | 浸しすぎ | assumed |
+| `hauDryD` | 島の時計で 2〜3 日（日陰） | 乾かす | assumed |
+| `hauRopeMgPerM` | 15〜25 g/m（太さ 6 mm） | 縄 1 m に要る繊維 | assumed |
+| `hauStrength` | 殻の縄の 1.5 倍 | 同じ太さの縄の切れにくさ（ジュートは coir より強い） | assumed（相対値。出典：PROTA「ジュートに似る」） |
+| `hauSeaDecayPerD` | 海に浸かっている 1 島日ごとに強さ −2 % | 海での傷み | assumed |
+| `coirSeaDecayPerD` | 海に浸かっている 1 島日ごとに強さ −0.3 % | 殻の縄の海での傷み（いまの cord の値があればそちらに合わせる） | assumed |
+| `soakWater` の効き目 | sea と fresh で同じ | どちらがよいかの資料なし | assumed |
+
+- 確かめ方（入ったら）：浸す日数を 5・10・20 島日で回し、繊維の量と強さが表どおりに変わること。海の仕事に樹皮の縄を使った筏の縛りが、殻の縄より早く切れること。
