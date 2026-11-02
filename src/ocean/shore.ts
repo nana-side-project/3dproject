@@ -305,7 +305,7 @@ export function buildShore(loc: any, group: THREE.Group, T: any, obst: { raise(x
   // (each refilled only when the camera has moved a good way). The ids three.js draws for them: from a stream of their own.
   type Native = { it: Spot; kind: number; v: number; m: THREE.Matrix4 };
   const natives: Native[] = [];
-  let nativeUpdate = (_c: THREE.Vector3) => {};
+  let nativeUpdate = (_c: THREE.Vector3, _now = false) => {};
   if (native && lists.casuarina.length) {
     const sc = new THREE.Matrix4();
     for (const it of lists.casuarina) {
@@ -319,12 +319,12 @@ export function buildShore(loc: any, group: THREE.Group, T: any, obst: { raise(x
       for (const kind of [0, 2]) for (const v of [0, 1]) for (const lo of [false, true]) {
         const n = natives.filter((t) => t.kind === kind && t.v === v).length; if (!n) continue;
         const sh = forest.shape(kind, v), mesh = new THREE.InstancedMesh(lo ? sh.lo : sh.geo, sh.mat, n);
-        mesh.frustumCulled = false; mesh.count = 0; group.add(mesh); meshes.push({ kind, v, lo, mesh });
+        mesh.frustumCulled = false; mesh.count = 0; mesh.userData.beachTrees = lo ? "far" : "near"; group.add(mesh); meshes.push({ kind, v, lo, mesh });
       }
     } finally { Math.random = keepM; }
     const at = new THREE.Vector3(1e9, 0, 1e9), NEAR = 110;
-    nativeUpdate = (c: THREE.Vector3) => {
-      if ((c.x - at.x) ** 2 + (c.z - at.z) ** 2 < 15 * 15) return;
+    nativeUpdate = (c: THREE.Vector3, now = false) => {
+      if (!now && (c.x - at.x) ** 2 + (c.z - at.z) ** 2 < 15 * 15) return;
       at.copy(c);
       for (const o of meshes) {
         let n = 0;
@@ -405,6 +405,10 @@ export function buildShore(loc: any, group: THREE.Group, T: any, obst: { raise(x
       U.uHaze.value += (inF - U.uHaze.value) * 0.05;
     },
     push: (p: THREE.Vector3) => forest.push(p),
+    /** The beach trees (Dot's world) drawn, at once, as they are seen from `pos` — the fine shape near it, the coarser one
+     *  beyond — however little the camera has moved: for a cut to another place, or a turn, the frame it happens
+     *  (viewer design D35: the drones' crew). Nothing else is changed; update() goes on as before from there. */
+    repack: (pos: THREE.Vector3) => nativeUpdate(pos, true),
   };
 }
 
