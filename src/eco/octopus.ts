@@ -100,9 +100,9 @@ for (let k = 0; k < 20; k++) THREE.MathUtils.generateUUID();
 // The arms' centre lines, worked out in the vertex shader for each point (a few short steps along the arm, so each
 // can bend its own way): spread, they reach out over the reef from the crown and lie along it, the tips lifting and
 // curling over to the side; walking, a wave runs out along each, the arms on either side out of step; in the den
-// (spread low) they are drawn in short and coiled; jetting (spread 0), they stream out behind together.
+// (spread low) they are drawn in short and coiled; jetting (spread 0), they stream out together behind the crown, the mantle leading.
 const ARM_GLSL = /* glsl */ `
-uniform float uSpread; uniform float uWalk; uniform float uSeed;
+uniform float uSpread; uniform float uWalk; uniform float uSeed; uniform float uJet;
 const float ARM_L = 0.98;
 float armTh(float a){ return a * 0.785398 + 0.39; }
 // how thick the arm is at s (0 crown .. 1 tip)
@@ -129,11 +129,12 @@ vec3 armSpread(float a, float s){
 }
 vec3 armTrail(float a, float s){
   float th = armTh(a), ph = uSeed + a * 2.17;
-  vec3 base = vec3(CROWN_X, CROWN_Y, CROWN_Z) + vec3(sin(th), 0.0, cos(th)) * CROWN_R * 0.5;
-  // (back past the mantle, close together, a ripple along them)
-  vec3 dir = normalize(vec3(sin(th) * 0.18, 0.06, -1.0));
-  vec3 side = normalize(cross(vec3(0.0, 1.0, 0.0), dir));
-  return base + dir * ARM_L * 1.05 * s + side * sin(uTime * 3.0 + ph - s * 6.0) * 0.04 * s - vec3(sin(th), 0.0, cos(th)) * 0.1 * s * s;
+  // (out from the crown straight away from the mantle, along the body's own line: the mantle leads, the arms
+  // follow in a close bundle, drawn together past the crown and fanning a little toward the tips)
+  vec3 D = vec3(0.0, -0.607, 0.794), e1 = vec3(1.0, 0.0, 0.0), e2 = vec3(0.0, 0.794, 0.607);
+  vec3 ro = e1 * sin(th) + e2 * cos(th), rt = e1 * cos(th) - e2 * sin(th);
+  float r = CROWN_R * 0.55 * (1.0 - 0.45 * smoothstep(0.0, 0.3, s)) + 0.05 * s * s;
+  return vec3(CROWN_X, CROWN_Y, CROWN_Z) + ro * r + D * ARM_L * 1.05 * s + rt * sin(uTime * 3.0 + ph - s * 6.0) * 0.03 * s;
 }
 vec3 armC(float a, float s){ return mix(armTrail(a, s), armSpread(a, s), uSpread); }
 `;
@@ -145,6 +146,8 @@ function octopusMaterial() {
      varying vec3 vWp; varying vec3 vN; varying vec3 vL; varying float vPart; varying float vT; varying float vUnder; varying vec2 vCs;
      void main(){
        vec3 p = position; vec3 n = normal; float t = aT, under = 0.0;
+       // jetting, the mantle squeezes in time with the strokes that drive it
+       if (aPart < 0.5) p -= n * uJet * (0.5 + 0.5 * sin(uTime * 9.0)) * 0.025 * sin(3.14159 * min(1.0, t / 0.62));
        if (aPart > 0.5 && aPart < 1.5) {
          // round the arm's centre line: its frame from the line's own direction; flattened underneath
          vec3 c = armC(aArm, t), c2 = armC(aArm, min(1.0, t + 0.02)), c0 = armC(aArm, max(0.0, t - 0.02));
@@ -214,7 +217,7 @@ function octopusMaterial() {
        col += absorbSeen(vec3(0.9, 0.95, 1.0) * pow(max(dot(n, hv), 0.0), mix(28.0, 90.0, eye)) * mix(0.07, 0.6, eye) * uSunI, vWp.y);
        gl_FragColor = vec4(col, 1.0);
      }`,
-    { uniforms: { uSpread: { value: 1 }, uWalk: { value: 0 }, uSeed: { value: Math.random() * 20 }, uCamo: { value: new THREE.Color(0.55, 0.42, 0.3) }, uAlarm: { value: 0 } },
+    { uniforms: { uSpread: { value: 1 }, uWalk: { value: 0 }, uJet: { value: 0 }, uSeed: { value: Math.random() * 20 }, uCamo: { value: new THREE.Color(0.55, 0.42, 0.3) }, uAlarm: { value: 0 } },
       opts: { side: THREE.DoubleSide } });
 }
 
@@ -230,7 +233,7 @@ export function makeOctopi(oc: any, count: number, rock: number[]) {
     const m = new THREE.Mesh(GEO, octopusMaterial());
     m.frustumCulled = false;
     const o: any = { mesh: m, pos: new THREE.Vector3(), den: new THREE.Vector3(), head: 0, t: R() * 50, state: 'den' as State, stateT: 0, placed: false,
-      spread: 0.3, walk: 0, alarm: 0, size: rr(0.55, 0.8), goal: null as THREE.Vector3 | null, up: new THREE.Vector3(0, 1, 0) };
+      spread: 0.3, walk: 0, alarm: 0, jet: 0, size: rr(0.55, 0.8), goal: null as THREE.Vector3 | null, up: new THREE.Vector3(0, 1, 0) };
     m.scale.setScalar(o.size);
     (m.material as THREE.ShaderMaterial).uniforms.uCamo.value.setRGB(rock[0] * 1.05, rock[1] * 0.9, rock[2] * 0.75);
     o.subject = { key: `octopus:${i}`, label: 'ワモンダコ', kind: 'octopus', prio: 2.1, size: 0.9, pos: () => (o.placed ? o.pos : null), status: () => STATUS[o.state as State], live: () => o.placed } as Subject;
@@ -333,6 +336,7 @@ export function updateOctopi(oc: any, dt: number, env: Env, cam: THREE.Vector3, 
     else if (o.state === 'settle') { alarm = 1 - smooth(0, 5, o.stateT); }
     o.spread += (spread - o.spread) * Math.min(1, dt * (o.state === 'jet' ? 6 : 1.2));
     o.walk += (walk - o.walk) * Math.min(1, dt * 2);
+    o.jet += ((o.state === 'jet' ? 1 : 0) - o.jet) * Math.min(1, dt * (o.state === 'jet' ? 6 : 1.5));
     o.alarm += (alarm - o.alarm) * Math.min(1, dt * (alarm > o.alarm ? 8 : 1));
     // Crawling keeps to the surface, up and down its sides: speed is along the surface, so on a steep
     // flank the octopus creeps up or down it rather than hopping onto the top or dropping off the edge.
@@ -352,13 +356,15 @@ export function updateOctopi(oc: any, dt: number, env: Env, cam: THREE.Vector3, 
     _r.crossVectors(o.up, _f).normalize();
     _m.makeBasis(_r, o.up, _f);
     _q.setFromRotationMatrix(_m);
-    if (o.state === 'jet') _q.multiply(_qj.setFromAxisAngle(_ax.set(1, 0, 0), -0.3));
-    o.mesh.quaternion.slerp(_q, Math.min(1, dt * 5));
+    // jetting it goes mantle first: turned about so the mantle points the way it goes, and pitched level along
+    // the body's line (crown to mantle tip), the arms streaming out behind
+    if (o.state === 'jet') _q.multiply(_qj.setFromAxisAngle(_ax.set(0, 1, 0), Math.PI)).multiply(_qj.setFromAxisAngle(_ax.set(1, 0, 0), -0.652));
+    o.mesh.quaternion.slerp(_q, Math.min(1, dt * (o.state === 'settle' ? 2 : 5)));
     const steep = 1 - o.up.y;
     o.mesh.scale.set(o.size, o.size * (1 - steep * 0.25), o.size);
     o.mesh.position.copy(o.pos).addScaledVector(o.up, -steep * 0.05 * o.size);
     const u = (o.mesh.material as THREE.ShaderMaterial).uniforms;
-    u.uSpread.value = o.spread; u.uWalk.value = o.walk; u.uAlarm.value = o.alarm;
+    u.uSpread.value = o.spread; u.uWalk.value = o.walk; u.uJet.value = o.jet; u.uAlarm.value = o.alarm;
     void _v;
   }
 }
