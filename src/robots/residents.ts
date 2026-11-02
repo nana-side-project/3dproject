@@ -291,6 +291,8 @@ const rr = (a: number, b: number) => a + Math.random() * (b - a);
 const fill = (s: string, vars: Record<string, string | number>) => s.replace(/\{(\w+)\}/g, (_, k) => String(vars[k] ?? ''));
 const smooth01 = (a: number, b: number, x: number) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 const localHour = (ms: number) => (((ms / 3.6e6 + 9) % 24) + 24) % 24;
+/** When the two gatherings begin (island hours): the morning's at the meeting place, and the evening's round the fire. */
+export const MEET_AT = [8.85, 18.9] as const;
 /** Its day on the island (Asia/Tokyo), YYYY-MM-DD. */
 export const dayOf = (ms: number) => new Date(ms + 9 * 3.6e6).toISOString().slice(0, 10);
 const photosOn = (r: { photos?: PhotoRecord[] }, day: string) => (r.photos ?? []).filter((p) => p.day === day);
@@ -493,11 +495,11 @@ export function makeResidents(loc: any, T: any, fishNames: string[], birdNames: 
     if (!r.stuck && r.wear > 0.9) r.stuck = true;
     if (r.stuck && r.wear < 0.6) { r.stuck = false; r.wearLv = 1; note(r, 'wear', {}, '乾いてきて、また動けるようになった', obs); }
   }
-  const gatherHours = (hr: number) => hr >= 18.9 && hr < 21.0 && !storm();  // on the way / sitting round it (not in a typhoon: the custom waits)
+  const gatherHours = (hr: number) => hr >= MEET_AT[1] && hr < 21.0 && !storm();  // on the way / sitting round it (not in a typhoon: the custom waits)
   // (and in the morning, at the same place, the fire out: the one up all night says what the night showed, each says
   // what it will do — so the day's work is known before it is far along, and before any raft puts out; owner's wish,
   // 2026-10-06: at nine, talk from 9:00 to 9:30, those far off setting out a little before)
-  const morningHours = (hr: number) => hr >= 8.85 && hr < 9.5 && !storm();
+  const morningHours = (hr: number) => hr >= MEET_AT[0] && hr < 9.5 && !storm();
   const meetHours = (hr: number) => gatherHours(hr) || morningHours(hr);
   /** Whether a resident is called away (a gathering, its bed) within so many hours from now. */
   const calledSoon = (r: Resident | undefined, h: number) => { if (!r) return false; const hr = localHour(clockMs); for (let k = 0; k <= 8; k++) { const x = (hr + (h * k) / 8) % 24; if (meetHours(x) || sleepTime(r, x)) return true; } return false; };
@@ -4248,6 +4250,7 @@ export function makeResidents(loc: any, T: any, fishNames: string[], birdNames: 
   };
   (res as any).items = items;   // (for ?debug)
   (res as any).village = village; (res as any).items = items; (res as any).lab = lab; (res as any).T = T; (res as any).houseG = houseG; (res as any).shelterK = shelterK; (res as any).labReady = () => labReady().map((x) => x.entry.processId); (res as any).craftShow = (v: typeof craftShow) => (craftShow = v); (res as any).setCatalog = (c: CatalogEntry[]) => (catalog = c);   // (for checks)
+  (res as any).meetAt = MEET_AT; (res as any).meets = (hr: number) => meetHours(hr);   // (whether the custom keeps at that hour today — the live screen's knock of wood: src/live/cues.ts)
   (res as any).patches = patches; (res as any).beds = beds;   // (for checks: robots/body.ts)
   let convN = 0;
   function say(r: Resident, text: string, conv: number, fast: boolean, isl?: Tok[], en?: string) {
