@@ -2,8 +2,8 @@
 // again to a corner of the shelf it could not reach — its hands full, the pit fire waiting). On controlled ground, the
 // residents by habit:
 //   1 Lantern with a find goes to the shelf's stand and puts it on the shelf, its hands free
-//   2 three tries that did not get there: the fourth time it sets the find down where it is — kept with the finds, said
-//     so, its hands free
+//   2 three tries that did not get there: the fourth time it sets the find down at the front of the shelf — kept with the
+//     shelf's finds, and said so as it is counted (science on #209), its hands free
 // Usage: npx tsx --import ./scripts/node-assets.mjs scripts/shelve-check.ts
 import * as THREE from 'three';
 import { makeResidents } from '../src/robots/residents';
@@ -34,7 +34,7 @@ const carry = () => { lantern.pos.set(72, 2, -142); R.drift.kind = 0; R.drift.by
 { // 2
   const n = V.treasures.length; carry(); lantern.mo.shelveTries = 3;
   run(5, () => !lantern.holding);
-  want('2 three tries that did not get there: set down where it is, kept with the finds, said so', !lantern.holding && V.treasures.length === n + 1 && lantern.diary.some((e: any) => /を棚まで運べなかったので、その場に置いた/.test(e.text)),
+  want('2 three tries that did not get there: set down at the front of the shelf, on its count, said so', !lantern.holding && V.treasures.length === n + 1 && lantern.diary.some((e: any) => /を棚の奥まで運べなかったので、棚の手前に置いた/.test(e.text)),
     `holding '${lantern.holding}', finds ${n} → ${V.treasures.length}; ${lantern.diary.at(-1)?.text}`);
 }
 console.log(bad ? `FAIL (${bad})` : 'all ok');

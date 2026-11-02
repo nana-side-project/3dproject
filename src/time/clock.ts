@@ -1,6 +1,7 @@
 // The simulation clock and the sky it implies over the current site.
 import { sun, moon, tide, moonPhaseName } from './astro';
 import { smooth } from '../core/math';
+import { islandDate } from '../world/island-time';
 
 export type Preset = 'dawn' | 'noon' | 'dusk' | 'night';
 export const PRESET_LABEL: Record<Preset, string> = { dawn: '朝方', noon: '昼間', dusk: '夕方', night: '夜間' };
@@ -63,13 +64,14 @@ export function setSeason(season: Season, lat: number) {
   clock.offset = off; clock.season = season;
 }
 // sea temperature through the year: warmest in late August (late February south of the equator)
-export function seaTemp(ms: number, lat: number, range: [number, number]) {
-  const d = new Date(ms), doy = (ms - Date.UTC(d.getUTCFullYear(), 0, 1)) / 86400000;
+// (Dot's world: on the island's calendar — its day of the year — not the Earth's; ADR 0006/0007)
+export function seaTemp(ms: number, lat: number, range: [number, number], world?: string) {
+  const d = new Date(ms), doy = world ? islandDate(ms).dayOfYear : (ms - Date.UTC(d.getUTCFullYear(), 0, 1)) / 86400000;
   const peak = lat < 0 ? 50 : 233;
   return (range[0] + range[1]) / 2 + (range[1] - range[0]) / 2 * Math.cos((doy - peak) / 365.25 * Math.PI * 2);
 }
 
-interface SiteLike { lat: number; lon: number; tz: number; tide: { amp: number; lag: number; diurnal?: { d: number; lag: number } } }
+interface SiteLike { lat: number; lon: number; tz: number; tide: { amp: number; lag: number; diurnal?: { d: number; lag: number } }; world?: string }
 
 // Scan the site's local day (5-minute steps) for sunrise, solar noon and sunset.
 export function sunEvents(ms: number, site: SiteLike) {
@@ -121,6 +123,17 @@ export interface SkyState {
   month: number; mday: number;   // local calendar date, for seasonal visitors
 }
 
+/** The sea's season (month) and the real day (mday) its day's draws go by — a manta's day, the day's lot of fish, each
+ *  keyed by month and mday and drawn once a real day. Dot's world: the month is the island's, as it is at that real
+ *  day's noon — the same all through the real day (an island month is some 2.2 real days: none is skipped), so a day's
+ *  draw cannot change halfway through it; the day stays the real one (science on #212: else a draw thirteen times a
+ *  real day — a manta nearly every day). */
+function seasonDate(ms: number, site: SiteLike): { month: number; mday: number } {
+  const local = new Date(ms + site.tz * 3600000), mday = local.getUTCDate();
+  if (!site.world) return { month: local.getUTCMonth() + 1, mday };
+  const noon = Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), mday, 12) - site.tz * 3600000;
+  return { month: islandDate(noon).month, mday };
+}
 function toDir(alt: number, az: number): [number, number, number] {
   // world: -z north, +x east, +y up; refract into water (n = 1.333)
   const zen = Math.PI / 2 - Math.max(alt, 0.02);
@@ -177,7 +190,9 @@ export function skyState(ms: number, site: SiteLike): SkyState {
     phase, phaseLabel, moonAge: m.age, moonName: moonPhaseName(m.age),
     tideH: t.h, tideRate: t.rate,
     day: smooth(-0.05, 0.25, sa),
-    month: new Date(ms + site.tz * 3600000).getUTCMonth() + 1, mday: new Date(ms + site.tz * 3600000).getUTCDate(),
+    // the season what comes by goes by (the whales' months, a manta's months) and the real day its day's draws go by.
+    // Dot's world: the island's month — its day, light and dark, keeps the real clock (ADR 0006/0007; science on #166, #212)
+    ...seasonDate(ms, site),
     twilight: Math.exp(-(((s.alt * 180 / Math.PI) - 1) ** 2) / (2 * 7 * 7)),
   };
 }
