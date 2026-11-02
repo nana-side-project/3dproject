@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ドロンの帯</title>
+<!-- MULTICAM.md §3-1: the band at the lower left for each kind of camera — a resident's (as now), the sea's, a fixed post's,
+     the sky's. Four small live screens at 960×540, the band drawn as src/live/live.css draws it (one unit = a 1080th of the
+     tile's height). The pictures are the frames taken for the monitor wall (main f5d011f); the words are examples of what
+     each camera would say, not the world's values when the frames were taken. -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+SC:wght@500;600&family=IBM+Plex+Mono:wght@400&family=Zen+Old+Mincho:wght@500;600;700&display=swap">
+<style>
+  :root { --bg: #0b1218; }
+  @media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) { --bg: #0b1218; } }
+  html, body { margin: 0; background: var(--bg); }
+  .wall { position: relative; width: 1920px; height: 1080px; display: grid; grid-template-columns: 960px 960px; grid-template-rows: 540px 540px; }
+  .tv { position: relative; overflow: hidden; background: #000; outline: 1px solid rgba(255,250,240,.25);
+    --u: calc(540px / 1080); --s1: calc(var(--u) * 22); --s2: calc(var(--u) * 26); --s3: calc(var(--u) * 32); --s4: calc(var(--u) * 40);
+    --ink: rgba(255, 250, 240, 0.97); --ink2: rgba(255, 250, 240, 0.82); --ink3: rgba(255, 250, 240, 0.66); --gold: #e9cf98;
+    --mincho: 'Zen Old Mincho', serif; --sc: 'Cormorant SC', serif; --mono: 'IBM Plex Mono', monospace;
+    color: var(--ink); font-family: var(--mincho); font-weight: 500; letter-spacing: 0.02em; -webkit-font-smoothing: antialiased;
+    text-shadow: 0 0 calc(var(--u) * 10) rgba(0, 0, 0, 0.32), 0 0 calc(var(--u) * 2) rgba(0, 0, 0, 0.28); }
+  .tv > img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .tv::after { content: ''; position: absolute; inset: 0; background: linear-gradient(to top, rgba(0,0,0,.28), rgba(0,0,0,0) 45%); pointer-events: none; }
+  .band { position: absolute; z-index: 1; left: calc(var(--u) * 96); bottom: calc(var(--u) * 88); padding-left: calc(var(--u) * 22); border-left: 1px solid rgba(255, 250, 240, 0.38); }
+  .doron { font-family: var(--sc); font-size: var(--s1); color: var(--ink2); letter-spacing: 0.2em; }
+  .doron .n { font-family: var(--mono); font-weight: 400; letter-spacing: 0.05em; margin-right: 0.6em; }
+  .who { display: flex; align-items: center; gap: calc(var(--u) * 14); margin-top: calc(var(--u) * 10); }
+  .who .name { font-size: var(--s3); font-weight: 600; letter-spacing: 0.08em; }
+  .who .line { width: calc(var(--u) * 26); height: 2px; background: var(--c, var(--ink)); opacity: 0.9; }
+  .who .place { width: calc(var(--u) * 26); height: 1px; background: var(--ink3); }
+  .status { font-size: var(--s4); margin-top: calc(var(--u) * 12); line-height: 1.35; white-space: nowrap; }
+  .here { font-size: var(--s2); color: var(--ink2); margin-top: calc(var(--u) * 10); display: flex; align-items: center; gap: calc(var(--u) * 10); }
+  .here .k { font-size: var(--s1); color: var(--ink3); letter-spacing: 0.08em; margin-right: calc(var(--u) * 4); }
+  .here .l { display: inline-block; width: calc(var(--u) * 18); height: 2px; background: var(--c); margin-right: calc(var(--u) * 6); vertical-align: middle; }
+  svg.isl { height: 1.25em; vertical-align: middle; }
+  .tag { position: absolute; z-index: 1; right: 14px; top: 12px; font: 400 15px/1.35 'Zen Old Mincho', serif; color: rgba(255,250,240,.86);
+    background: rgba(6,10,14,.6); padding: 6px 10px; text-align: right; letter-spacing: .04em; text-shadow: none; }
+  .tag b { font-family: 'IBM Plex Mono', monospace; font-weight: 400; color: #e9cf98; margin-right: 6px; }
+</style></head>
+<body><div class="wall" id="wall"></div>
+<script>
+// (the island's letters: src/robots/islandlang.ts glyphs(), copied for the mock)
+const BASE = { '': '<circle cx="5" cy="8" r="3"/>', p: '<path d="M5 3V13"/>', t: '<path d="M2 3H8M5 3V13"/>', k: '<path d="M8 3L2 8L8 13"/>',
+  m: '<path d="M2 13V7Q5 1 8 7V13"/>', n: '<path d="M1.5 8Q3.25 4.5 5 8T8.5 8"/>', s: '<path d="M8 3L2 13"/>', h: '<path d="M3 3V13M7 3V13"/>',
+  l: '<path d="M6 3V11Q6 13 3.5 13"/>', w: '<path d="M2 3L5 13L8 3"/>' };
+const MARK = { a: '', i: '<circle cx="5" cy="1" r="0.9" class="f"/>', u: '<circle cx="5" cy="15.2" r="0.9" class="f"/>', e: '<path d="M11 6V10"/>', o: '<circle cx="11" cy="8" r="1.3"/>' };
+function glyphs(word) {
+  let x = 0; const parts = [];
+  for (const m of word.matchAll(/([ptkmnshlw]?)([aiueo])/g)) { parts.push(`<g transform="translate(${x} 0)">${BASE[m[1]]}${MARK[m[2]]}</g>`); x += 12; }
+  return `<svg class="isl" viewBox="-1 -1 ${x + 2} 18" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round"><style>.f{fill:currentColor;stroke:none}</style>${parts.join('')}</svg>`;
+}
+// [picture, number, island word, name, line colour (null: a place), status, the small row, the tag]
+const TV = [
+  ['mc-day-dot.jpg', '01', 'toto', 'ドット', '#ffd98a', '歩いている', null, ['01', '住人のカメラ（いまのまま）']],
+  ['mc-day-sea.jpg', '05', 'lu', '海', null, 'サンゴの浅瀬', null, ['05', '海：撮っている生き物、なければ水の区分']],
+  ['mc-day-yard.jpg', '06', 'hata', '家', null, '柱を立てている', [['ドット', '#ffd98a']], ['06', '定点：いる住人のしていること＋「ここにいる」']],
+  ['mc-day-sky.jpg', '13', 'nesi', '島の上', null, '島めぐり', null, ['13', '空：主の画のときだけ。つなぎ（3〜5秒）は帯なし']],
+];
+const W = document.getElementById('wall');
+for (const [img, no, word, name, color, status, here, tag] of TV) {
+  const who = color ? `${glyphs(word)}<span class="name">${name}</span><span class="line" style="--c:${color}"></span>`
+                    : `${glyphs(word)}<span class="name">${name}</span><span class="place"></span>`;
+  const hereRow = here ? `<div class="here"><span class="k">ここにいる</span>${here.map(([n, c]) => `<span><span class="l" style="--c:${c}"></span>${n}</span>`).join('')}</div>` : '';
+  W.insertAdjacentHTML('beforeend', `<div class="tv"><img src="${img}" alt=""><div class="tag"><b>${tag[0]}</b>${tag[1]}</div>
+    <div class="band"><div class="doron"><span class="n">${no}</span>DORON</div><div class="who">${who}</div><div class="status">${status}</div>${hereRow}</div></div>`);
+}
+</script></body></html>
