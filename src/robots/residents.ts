@@ -13,7 +13,7 @@ import { AIRLIT } from '../ocean/shore';
 import { findPath as findPathRaw } from './path';
 import { profed, profBegin, profEnd } from '../core/prof';
 import { Solids, type Body, type Solid } from './solids';
-import { Agent, type Habit } from './agent/agent';
+import { Agent, type Habit, type TrialEvent } from './agent/agent';
 import { modelBrain } from './agent/brain';
 import { MINDS } from './agent/config';
 import type { Brain, BrainInput, Observation, Option, Outcome, Request } from './agent/types';
@@ -23,15 +23,15 @@ import { creatureKit, type CMats, type Food } from './creatures';
 import { mulberry32 } from '../core/math';
 import { BODY as NEEDS, PREY_JA, FILLS, drain, makePatch, regrow, regrowBed, dive, bodyState, trouble, newDay, type Patch, type Bed, type BodyState, type Trouble, type Prey } from './body';
 import { VOICES, STAGES, type Voice } from './voices';
-import { SAY, glyphs, kana, subtitle, type Count, type Said, type Tok } from './islandlang';
+import { glyphs, kana, subtitle, type Count, type Said, type Tok } from './islandlang';
 import { islandDate, islandWait, islandWeather, ISLAND_RATE, type IslandWeather } from '../world/island-time';
 import type { EnvironmentSample, LotView } from '../world/science-contract';
 import { wickQuality } from '../science/step/oil-lamp';
 import { compactScienceLedger, recentScienceRuns } from '../world/science-records';
-import { abortRun, addLot, advance, assemble, assembleParts, emptyLedger, canTakeMass, refreshAssembled, refreshAssembledParts, startRun, takeMass, toClock, toReal } from '../world/process-runner';
+import { abortRun, addLot, advance, assemble, assembleParts, commit, emptyLedger, canTakeMass, nextRequest, refreshAssembled, refreshAssembledParts, startRun, takeMass, toClock, toReal, type Committed } from '../world/process-runner';
 import { CATALOG, canResumeProcessVersion, MATERIAL_JA, CLAY_PIT_PLAN, COOK_POT_ASSEMBLY, POT_ASSEMBLY, RETORT_ASSEMBLY, LAMP_DISH_ASSEMBLY, WICKS, TOOLS, SEASONED_PPM, RETORT_UPPER_ML, RETORT_LOWER_ML, SEAL_JAR_ML, RETORT_CHARGE_MG, WEATHER_POT_WATER_MG, type CatalogEntry } from '../world/process-catalog';
 import { clayPitMaterials, clayPitParams, CLAY_PIT } from '../science/step/clay-pit';
-import { RAW_CLAY_SOUTH } from '../world/planet-map';
+import { BAMBOO_SOUTH, RAW_CLAY_SOUTH } from '../world/planet-map';
 import { makeHuskHost, emptyHuskHostState, POOL_REACH_M, type HuskHostState, type HuskDevEntry, type HuskPool } from './husk-host';
 import { seaLevel } from '../time/sea-level';
 import { makeCordHost, emptyCordHostState, type CordHostState, type CordDevEntry } from './cord-host';
@@ -210,6 +210,8 @@ export interface Sense { eye: THREE.Vector3; look?: THREE.Vector3; head: number;
   goal?: { text: string; why: string; steps: string[]; by: string } }   // (its own goal and the steps left, in words: ADR 0004)
 export interface Bond { stage: number; know: number; talks: number; last: number; toldWorry: number }
 export interface Entry { at: number; text: string; who?: string; conv?: number; head?: boolean; key?: string; with?: string; obs?: string }   // (obs: what it measured or counted then, from the world — shown in a diary only when there is one)   // (a line someone said, or the heading of a conversation)
+/** A trial as told to the screen and the log (flushMind): text null where its words did not pass the rule. */
+export interface TrialMeta { kind: 'start' | 'result'; result?: TrialEvent['result']; text: string | null; outcome?: string; metric?: string; now?: number | string }
 export interface Resident {
   id: string; v: Voice; sp: Spec; model: Robot;
   pos: THREE.Vector3; head: number; battery: number; task: Task | null; walk: number; act: Act; wet: boolean;
@@ -217,6 +219,8 @@ export interface Resident {
   wear?: number; wearLv?: number; stuck?: boolean;   // (the two robots: how worn by rain, wind and storm 0..1, the last line it noted, held still until it dries — the world counts it)
   body?: BodyState;   // (the two animals: their own marks, the day's troubles — robots/body.ts)   // (the two who are animals: how hungry and how sleepy, what it has eaten this bout, how far down toward the bottom it is)
   talk: Talk | null; saying: string; sayT: number; sayIsl?: Tok[] | null; sayEn?: string | null;
+  trial?: { text: string | null; at: number; active: boolean };   // (what it is trying now, as the screen tells it: PROGRAM.md §1, R-030)
+  tried?: { text: string | null; result: NonNullable<TrialEvent['result']>; at: number; outcome?: string };   // (how its last try came out, in the words that try was shown in)
   sayUntil?: number;   // (a remark said on its own, outside a conversation: the world's time it is let go — R-023)
   stats: { built: number; notes: number; shells: number; cracked: number; visited: number; cairns: number; wood: number; food: number; felled: number; talkUse?: number };
   saidAt?: Record<string, number>;   // (what it last told whom, and when: not the same thing again straight away)
@@ -227,14 +231,15 @@ export interface Resident {
   path?: { pts: [number, number][]; tx: number; tz: number; t: number };   // the way it means to walk (robots/path.ts)
   goal?: { tx: number; tz: number; x: number; z: number; none: boolean };   // where it will stand to reach where it is going (outside whatever is there)
   went?: 'arrived' | 'blocked' | 'no way' | 'nowhere to stand';   // how its last walk ended (robots/solids.ts)
+  voyageNoAt?: number;   // (when the world last turned its crossing back — the day judged, or a typhoon at sea: not again by habit for three hours)
   spotted?: string[];   // the fish it has really made out since its last note (for its diary)
   photos?: PhotoRecord[];   // the photographs it chose to take (its media: src/journal/)
   seen?: { name: string; pos: THREE.Vector3; t: number; dur: number; lost: number };   // a fish going by that it is watching (Kamemaru, grazing)
   // for its body (what the model is told, not the world's facts): how far its feet have gone, how fast it
   // is going, what it is looking at, and which spell of doing something this is and for how long
   mo: { stride: number; px: number; pz: number; ph: number; gait: number; key: number; t: number; act: string; task: Task | null; look: THREE.Vector3 | null; why: string; hold: number; glance: number;
-    probe: number; since: number; fails: number; bad: [number, number][]; poi?: { key: number; a: number }; recheck: number; grazeTry?: { bed: string; at: number; hunger: number }; grazeAvoid?: Record<string, number>;
-    bout?: { patch?: string; tries: number; got: number; weak: number; full: number; opt?: string }; coldAt?: number; roughFelt?: number; walkedAt?: number; backFrom?: [number, number] };   // (recheck: back to what it was doing, a look at it first)   // (Lantern: trying the footing ahead, how far since it last did, where it found it would not do)
+    probe: number; since: number; fails: number; bad: [number, number][]; poi?: { key: number; a: number }; recheck: number; grazeTry?: { bed: string; at: number; hunger: number }; stuckAt?: number; shelveTries?: number; grazeAvoid?: Record<string, number>;
+    bout?: { patch?: string; tries: number; got: number; weak: number; full: number; opt?: string }; coldAt?: number; roughFelt?: number; walkedAt?: number; backFrom?: [number, number]; lift?: { y: number; at: number; held: boolean } };   // (recheck: back to what it was doing, a look at it first)   // (Lantern: trying the footing ahead, how far since it last did, where it found it would not do)
   lightK?: number;
   resume?: Task; resumeAt?: number;     // what it was in the middle of when someone came up to talk (to go back to after)
   holding: '' | ItemKind | 'piece' | 'plank' | 'drift' | 'grass';   // what it has in its hands
@@ -256,7 +261,7 @@ export interface Residents {
   worksiteSpots(): Record<string, { x: number; z: number; face?: number }>;
   focus(r: Resident | null): void;        // the one being watched: mark where it is heading
   bubbles(camera: THREE.Camera, w: number, h: number): void;
-  onEvent: (kind: string, text: string, r: Resident, meta?: { milestone?: string }) => void;   // (meta.milestone: the first time this kind of thing happened on the island — world/milestones.ts)
+  onEvent: (kind: string, text: string, r: Resident, meta?: { milestone?: string; trial?: TrialMeta }) => void;   // (meta.milestone: the first time this kind of thing happened on the island — world/milestones.ts; meta.trial: kind 'trial', one begun or how one came out)
   onSay: (r: Resident, text: string) => void;   // someone starts saying something (for its voice)
   gibber(id: string, text: string): string;      // what it is saying, in the island's own letters and how they sound (HTML)
   sense(r: Resident): Sense;                       // what it sees and what it is up to, for its own point of view
@@ -369,14 +374,16 @@ export function makeResidents(loc: any, T: any, fishNames: string[], birdNames: 
   // is now made of fewer things than before, the ids the old one drew are drawn all the same — so the island's random
   // draws, and so its days, stay as they were. n: how many ids)
   const sameDraws = (n: number) => { for (let k = 0; k < n; k++) THREE.MathUtils.generateUUID(); };
-  // young casuarinas on the ground Dot will clear for the field (the first three), and two more beyond
+  // young trees on the ground Dot will clear for the field (the first three), and two more beyond
   const TREES = [[-0.4, 5.6], [1.9, 6.9], [-2.4, 7.3], [5.2, -2.6], [-4.8, -3.2]].map(([lx, lz], i) => {
     const w = atHut(lx, lz), g = new THREE.Group(); g.position.set(w.x, L.h(w.x, w.z), w.z); group.add(g);
     const pivot = new THREE.Group(); g.add(pivot);
     // (drawn as the beach's own casuarinas are — their drooping twigs, the same light — only young: 2.7 m; owner
     // 2026-10-10, nature team. Where the shore is not built, a trunk and a crown of rounded masses as before)
     const look = T.plantLook;
-    if (look) { const m = new THREE.InstancedMesh(look.geo.casuarina, look.mat, 1); m.setMatrixAt(0, new THREE.Matrix4().makeRotationY(i * 1.7).scale(new THREE.Vector3(2.4, 2.7, 2.4))); m.frustumCulled = false; m.userData.shared = true; pivot.add(m); sameDraws(10); }
+    // (Dot's world has no casuarina: there they are young オオハマボウ, as tall — ocean/shore.ts T.plantLook.sapling)
+    const sap = look?.sapling, sw = sap ? 2.7 * sap.wide * 0.75 : 2.4;
+    if (look) { const m = new THREE.InstancedMesh(sap ? sap.geo : look.geo.casuarina, sap ? sap.mat : look.mat, 1); m.setMatrixAt(0, new THREE.Matrix4().makeRotationY(i * 1.7).scale(new THREE.Vector3(sw, 2.7, sw))); m.frustumCulled = false; m.userData.shared = true; pivot.add(m); sameDraws(10); }
     else {
       const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.1, 2.4, 7), wood2); trunk.position.y = 1.2; pivot.add(trunk);
       const crown = new THREE.Group(); crown.position.y = 2.3; pivot.add(crown);
@@ -492,6 +499,8 @@ export function makeResidents(loc: any, T: any, fishNames: string[], birdNames: 
   // 2026-10-06: at nine, talk from 9:00 to 9:30, those far off setting out a little before)
   const morningHours = (hr: number) => hr >= 8.85 && hr < 9.5 && !storm();
   const meetHours = (hr: number) => gatherHours(hr) || morningHours(hr);
+  /** Whether a resident is called away (a gathering, its bed) within so many hours from now. */
+  const calledSoon = (r: Resident | undefined, h: number) => { if (!r) return false; const hr = localHour(clockMs); for (let k = 0; k <= 8; k++) { const x = (hr + (h * k) / 8) % 24; if (meetHours(x) || sleepTime(r, x)) return true; } return false; };
   let fireK = 0, fireTalkT = 5, lastSpeaker = '', fireSaid = false, fireConv = 0, fireLines = 0, lastFireAt = 0;
   const fireQueue: { who: string; line: string; isl?: Tok[]; en?: string }[] = [];
   const fireUsed = new Set<string>();
@@ -501,15 +510,18 @@ export function makeResidents(loc: any, T: any, fishNames: string[], birdNames: 
   // Out from the beach in front of the hut into the lagoon: four pilings (a stone base Lantern brings,
   // a post Rakko swims out and sets on it) and eight deck planks Dot shapes and lays. Kamemaru surveys
   // it first. It starts once they have sat round the fire together a few times.
-  const village = { fires: 0, mornings: 0, pier: 'none' as 'none' | 'plan' | 'build' | 'done', bases: 0, posts: 0, deck: 0, treasures: [] as { what: string; who: string; at: number }[], map: emptyMap(), raft: { parts: 0, x: NaN, z: NaN, hauled: false }, spare: 0, lampLog: [] as { at: number; fiber: number; lumenS: number; litS: number; soot: number }[], huskHost: emptyHuskHostState() as HuskHostState, cordHost: emptyCordHostState() as CordHostState, sailHost: emptySailHostState() as SailHostState, labRuns: [] as { runId: string; processId: string; key?: string; by: string; startOnClock: number; outAt?: number; felt?: string }[], gaugeLog: [] as GaugeEntry[], catcher: null as null | { at: number; areaM2: number; capMg: number }, hypo: null as null | Hypo, hypo2: null as null | Hypo, hypoHistory: [] as { at: number; nextRunId?: string; hypothesis: Hypo }[],
+  const village = { fires: 0, mornings: 0, pier: 'none' as 'none' | 'plan' | 'build' | 'done', bases: 0, posts: 0, deck: 0, treasures: [] as { what: string; who: string; at: number }[], map: emptyMap(), raft: { parts: 0, x: NaN, z: NaN, hauled: false, quick: false }, spare: 0, lampLog: [] as { at: number; fiber: number; lumenS: number; litS: number; soot: number }[], huskHost: emptyHuskHostState() as HuskHostState, cordHost: emptyCordHostState() as CordHostState, sailHost: emptySailHostState() as SailHostState, labRuns: [] as { runId: string; processId: string; key?: string; by: string; startOnClock: number; outAt?: number; felt?: string; next?: { action: string; params?: Record<string, number> }[]; lowered?: number }[], gaugeLog: [] as GaugeEntry[], catcher: null as null | { at: number; areaM2: number; capMg: number }, hypo: null as null | Hypo, hypo2: null as null | Hypo, hypoHistory: [] as { at: number; nextRunId?: string; hypothesis: Hypo }[],
     labDone: [] as { at: number; processId: string; ok: boolean }[], taught: {} as Record<string, number>, feedback: [] as { from: string; to: string; f: Frame; at: number }[], stormPrep: 0, heardOkAt: 0,
     swellGuess: { alarm: 0, hits: 0, falses: 0 },
     house: { n: 0, rope: 0, bamboo: 0, clay: 0, lost: 0, weighed: false },
     wall: { n: 0, pile: 0 }, nest: { n: 0, at: null as null | [number, number] }, kameBed: null as null | [number, number], ledge: { n: 0 },
     walks: {} as Record<string, number[]>, settle: null as null | { at: number; by: string; asked: Record<string, 'yes' | 'no'>; homes: Record<string, [number, number]> },
-    felled: [] as { x: number; z: number; h: number; kind: number; at: number }[],
+    felled: [] as { x: number; z: number; h: number; kind: number; at: number; fuel?: 1 }[],   // (fuel: felled to burn — firewood, charcoal, lime — not to open land: D-charcoal-pit §6.2)
     clayPit: null as null | { at: number; diameterCm: number; depthCm: number },
-    prepBy: '', prepSaved: [] as string[], heed: {} as Record<string, number>, onsetHunger: {} as Record<string, number>, stormLog: [] as { at: number; warned: boolean; by: string; saved: string[]; lost: string[] }[] };
+    firstLoad: null as null | { at: number; clayMg: number; bambooMg: number; lots: string[] },   // (the first raft load from the island to the south, once: firstLoad())
+    loadMin: null as null | { clayMg: number; bambooMg: number },   // (chapter 1: the least of the clay and bamboo brought, not yet used, so far — chapter1Tick)
+    southSetOut: 0,   // (chapter 1: crossings to the south island set out on, until its load came)
+    prepBy: '', prepSaved: [] as string[], prepTold: true, swellSeen: null as null | { at: number; swell: number; period: number }, prepKnown: [] as string[], /* (getting ready begun at sea, not yet talked over at a gathering; the long swell Kamemaru saw; who has heard of the getting ready) */ heed: {} as Record<string, number>, onsetHunger: {} as Record<string, number>, stormLog: [] as { at: number; warned: boolean; by: string; saved: string[]; lost: string[] }[] };
   // the world's lots and equipment (src/world/process-runner.ts): what Dot brings home, and what Lantern's processes
   // make of it. Here in the browser's island for now; the same ledger moves to the shared world's server (ADR 0002)
   const lab = emptyLedger('dotworld', 'e1');
@@ -886,6 +898,17 @@ export function makeResidents(loc: any, T: any, fishNames: string[], birdNames: 
     const lee = all.filter((t) => !windward(t.x, t.z)).slice(0, n), ww = all.find((t) => windward(t.x, t.z));
     return [...lee, ...(ww ? [ww] : [])].map((t) => ({ ...t, d: Math.hypot(t.x - r.pos.x, t.z - r.pos.z) }));
   }
+  /** A tree to fell to burn (D-charcoal-pit §6.2, science 2026-10-29): an オオハマボウ within 60 m of the house — it grows
+   *  again from its stump; 121 of them, so the firewood holds until the first stumps have grown again (science's 90 days,
+   *  2026-10-31) — the nearest first; never a テリハボク (the boats' and houses' wood), a ハスノハギリ or a ガジュマル, nor
+   *  one of the windbreak. */
+  function fuelTree(r: Resident) {
+    if (!T.forest) return null;
+    const c = houseG.position;   // (counted from the house, as the windbreak is)
+    const all = (T.forest.standingNear(c.x, c.z, 60) as { x: number; z: number; y: number; h: number; kind: number }[]).filter((t) => t.kind === 1 && !windward(t.x, t.z));
+    const t = all.sort((a, b) => Math.hypot(a.x - c.x, a.z - c.z) - Math.hypot(b.x - c.x, b.z - c.z))[0];
+    return t ? { ...t, d: Math.hypot(t.x - r.pos.x, t.z - r.pos.z) } : null;
+  }
   function fellTask(x: number, z: number): Task | null {
     const t = T.forest?.standingNear(x, z, 0.6)?.[0]; if (!t) return null;
     return task('fell', [t.x, t.z], 'chop', rr(60, 90) + t.h * 15, { data: { x: t.x, z: t.z } });
@@ -1098,11 +1121,14 @@ export function makeResidents(loc: any, T: any, fishNames: string[], birdNames: 
   /** When it has passed: what was saved by getting ready, what was lost; those whose getting ready paid remember it. */
   function stormOutcome() {
     const warned = village.stormPrep > 0 && village.stormPrep <= stormSince, by = village.prepBy, saved: Record<string, string[]> = {}, lost: Record<string, string[]> = {};
+    const knew = (r: Resident) => warned && village.prepKnown.includes(r.id);   // (each by what it had heard: science on #188)
     const add = (m: Record<string, string[]>, id: string, what: string) => (m[id] ??= []).push(what);
     if (village.raft.parts > 0) {
-      if (village.raft.hauled) add(saved, 'dot', '筏');
-      else { const n = Math.ceil(village.raft.parts / 2); village.raft.parts -= n; add(lost, 'dot', `筏の部材${n}本`); }
-      village.raft.hauled = false; drawRaft();
+      // (hauled up beforehand: whole; in a hurry as it came: a quarter of its pieces lost — not counted as getting ready
+      // that paid, so not remembered as one; left on the beach: half)
+      if (village.raft.hauled && !village.raft.quick) add(saved, 'dot', '筏');
+      else { const n = Math.ceil(village.raft.parts / (village.raft.hauled ? 4 : 2)); village.raft.parts -= n; add(lost, 'dot', `筏の部材${n}本${village.raft.hauled ? '（急いで引き上げた）' : ''}`); }
+      village.raft.hauled = false; village.raft.quick = false; drawRaft();
     }
     if (village.prepSaved.includes('畑の実')) add(saved, 'dot', '畑の実');
     if (village.house.n >= ROOF_N) {   // (thatch: a roof not weighed down loses a course or two — with walls round it, fewer)
@@ -1117,27 +1143,38 @@ export function makeResidents(loc: any, T: any, fishNames: string[], birdNames: 
     for (const r of list) if (r.sp.living) {
       const h0 = village.onsetHunger[r.id] ?? r.hunger;
       if (r.hunger > 0.8) add(lost, r.id, 'おなか（台風のあいだ食べられず、弱った）');
-      else if (warned && h0 < 0.4) add(saved, r.id, 'おなか（前もって食べておいた）');
+      else if (knew(r) && h0 < 0.4) add(saved, r.id, 'おなか（前もって食べておいた）');
     }
     const ja = (xs: string[]) => xs.join('・');
     for (const r of list) {
       const sv = saved[r.id] ?? [], ls = lost[r.id] ?? [];
       if (!sv.length && !ls.length) continue;
-      const text = warned
+      const text = knew(r)
         ? `${byId[by]?.v.name ?? ''}の知らせで備えた。${sv.length ? `${ja(sv)}は無事だった` : ''}${sv.length && ls.length ? '。' : ''}${ls.length ? `${ja(ls)}は失った` : ''}`
         : `台風が来ると前もって知らなかった。${ls.length ? `${ja(ls)}を失った` : ''}${sv.length ? `${ja(sv)}は無事だった` : ''}`;
       r.diary.push({ at: clockMs, text, key: 'weather' }); if (r.diary.length > 800) r.diary.shift();
       // (getting ready paid: it remembers whose sign it was — and asks, from now on, at the morning gathering)
-      if (warned && sv.length) { village.heed[r.id] = (village.heed[r.id] ?? 0) + 1; agentOf(r)?.values.bonus(`heed:${by}`, `${byId[by]?.v.name ?? by}の台風の知らせ`, 1); }
+      if (knew(r) && sv.length) { village.heed[r.id] = (village.heed[r.id] ?? 0) + 1; agentOf(r)?.values.bonus(`heed:${by}`, `${byId[by]?.v.name ?? by}の台風の知らせ`, 1); }
     }
     const allSaved = Object.values(saved).flat(), allLost = Object.values(lost).flat();
     village.stormLog.push({ at: clockMs, warned, by: warned ? by : '', saved: allSaved, lost: allLost }); if (village.stormLog.length > 30) village.stormLog.shift();
     if (warned && allSaved.length && byId[by]) byId[by].diary.push({ at: clockMs, text: `台風の知らせが役に立った（無事だったもの：${ja(allSaved)}）`, key: 'study' });
     tell('weather', warned ? `台風に備えていた。無事：${ja(allSaved) || 'なし'}／失ったもの：${ja(allLost) || 'なし'}` : `備えのないまま台風が過ぎた。失ったもの：${ja(allLost) || 'なし'}`, list[0]);
-    village.stormPrep = 0; village.prepSaved = []; village.onsetHunger = {};
+    village.stormPrep = 0; village.prepSaved = []; village.prepKnown = []; village.onsetHunger = {};
   }
   function prepActive() { return village.stormPrep > 0 && clockMs - village.stormPrep < islandWait(48 * 3.6e6); }
-  const eatAt = (r: Resident, d: number) => (r.body?.learn.eatAt ?? d) - (prepActive() ? 0.25 : 0);
+  // (the raft hauled up for a storm that did not come: back down the beach once the getting ready is over — else it stayed
+  // up for good after a swell that was not one: science, reviews/195-5ccc3a5 stall2c.log, 380 hours)
+  function prepOver() {
+    if (!village.raft.hauled || prepActive() || storm()) return;
+    village.raft.hauled = false; village.raft.quick = false; drawRaft();
+    byId.dot?.diary.push({ at: clockMs, text: '台風は来なかった。引き上げていた筏を、浜に戻した', key: 'do' });
+  }
+  // (getting ready is done by those who know of it — told at sea, at the gathering, or passed on after: not by one who
+  // has not heard; ADR 0004, science on #188. One who has not heard hauls the raft up only in a hurry as the storm comes)
+  const knowsPrep = (r: Resident) => prepActive() && village.prepKnown.includes(r.id);
+  const heardPrep = (...ids: string[]) => { if (prepActive()) for (const id of ids) if (!village.prepKnown.includes(id)) village.prepKnown.push(id); };
+  const eatAt = (r: Resident, d: number) => (r.body?.learn.eatAt ?? d) - (knowsPrep(r) ? 0.25 : 0);
   function voyageJudge(r: Resident, isleId: string): { go: boolean; why?: string; km: number } {
     const i = ISLES.find((x) => x.id === isleId)!, km = fromHome(i).km, hr = localHour(clockMs);
     if (storm()) return { go: false, why: '台風で海が荒れている', km };
@@ -1146,7 +1183,7 @@ export function makeResidents(loc: any, T: any, fishNames: string[], birdNames: 
     // there and back, and half an hour ashore; owner's decision 2026-10-06. Not before the morning gathering, and back
     // before the light goes)
     if (km > RAFT_KM) return { go: false, why: `筏では遠すぎる（約${km.toFixed(1)}km）`, km };
-    if (prepActive()) return { go: false, why: '台風の知らせが出ている', km };
+    if (knowsPrep(r)) return { go: false, why: '台風の知らせが出ている', km };
     if (hr < 9.5) return { go: false, why: '朝の集まりのあとで出る', km };
     if (hr + voyageMs(km) / 3.6e6 > 17.5) return { go: false, why: '日のあるうちに戻れない', km };
     if (r.battery < 0.6) return { go: false, why: `電池が足りない（${Math.round(r.battery * 100)}%）`, km };
@@ -1166,6 +1203,9 @@ export function makeResidents(loc: any, T: any, fishNames: string[], birdNames: 
       const brought = (i.carry ?? []).map((c) => ({ c, fresh: !Object.values(lab.lots).some((x) => x.materialId === c.materialId) }));
       for (const b of brought) addLot(lab, { lotId: `lot:${i.id}:${++lab.seq}`, materialId: b.c.materialId, amount: { value: b.c.mg, unit: 'mg' }, location: 'shelf', ...(b.c.quality ? { quality: { ...b.c.quality } } : {}) });
       drawStore();
+      // (chapter 1's end: a load of its own from the south island on the shelf — not the first load, and on a trial island
+      // only one after the first load came: science, specs/chapter1-world-values.md §4)
+      if (i.id === 'south-near' && brought.length && (!village.firstLoad || clockMs > village.firstLoad.at)) markFirst('south-load');
       const firstTime = !village.map.reached[i.id];
       village.map.reached[i.id] = { at: clockMs };
       r.diary.push({ at: clockMs, text: `${w}にたどり着いて戻った。あったもの：${i.has.join('・')}${brought.length ? `。持ち帰った：${brought.map((b) => `${b.c.ja} ${Math.round(b.c.mg / 1e6)}kg`).join('・')}（小屋の棚）` : ''}`, key: 'got' });
@@ -1398,6 +1438,35 @@ export function makeResidents(loc: any, T: any, fishNames: string[], birdNames: 
   /* ---------- what happened on the island, and whether it was a first (world/milestones.ts) ---------- */
   // (every event the world tells goes through here: the first of its kind is marked, and kept with the village, even
   // in the hours caught up on — the record is the world's, whoever is watching)
+  const firstsOf = () => ((village as any).firsts ??= {}) as Record<string, number>;
+  /** A first the world keeps without a card of its own (chapter 1's way and its load: PROGRAM.md §2-1). */
+  function markFirst(key: string) { const f = firstsOf(); if (f[key] === undefined) f[key] = clockMs; }
+  // (chapter 1's load (PROGRAM.md §2-1-2, science's specs/chapter1-world-values.md §5–6): the clay and bamboo not yet
+  // used, wherever they lie and whatever holds them — raw, settled and prepared clay; bamboo — its least so far (the
+  // weights hold water, which a step may add), and gone when nothing more can be made of it: clay under a lamp dish's
+  // 0.4 kg, bamboo under a tube's 0.2 kg. Kept until the south island's load comes, when the chapter ends.)
+  const CLAY_GONE_MG = 0.4e6, BAMBOO_GONE_MG = 0.2e6;
+  function chapter1Tick() {
+    const f = firstsOf(); if (!village.firstLoad || f['south-load'] !== undefined) return;
+    const mg = (ids: string[]) => Object.values(lab.lots).filter((l) => ids.includes(l.materialId)).reduce((n, l) => n + l.amount.value, 0);
+    const clay = mg(['raw_clay', 'settled_clay', 'prepared_clay']), bamboo = mg(['bamboo']), m = (village.loadMin ??= { clayMg: clay, bambooMg: bamboo });
+    m.clayMg = Math.min(m.clayMg, clay); m.bambooMg = Math.min(m.bambooMg, bamboo);
+    if (m.clayMg < CLAY_GONE_MG) markFirst('clay-gone');
+    if (m.bambooMg < BAMBOO_GONE_MG) markFirst('bamboo-gone');
+  }
+  // (chapter 2's way (PROGRAM.md §2-2, D34): the firewood — seasoned wood enough for a pit fire, every lot counted, a fire's
+  // own among them; the lamp dish — a fired one of the lamp's form, not cracked, as dishForLamp takes, or the dish made;
+  // the oil — coconut oil on the island. The pot and the light are the world's firsts already. Seen as the lab is.)
+  function chapter2Seen(): Record<'dry-wood' | 'lamp-dish' | 'oil', boolean> {
+    const lots = Object.values(lab.lots), dry = (l: LotView) => (l.quality?.water_ppm ?? 1e6) <= SEASONED_PPM;
+    const fire = catalog.find((e) => e.input === 'dry_pot')?.also?.find((x) => x.input === 'firewood')?.minMg ?? 30e6;
+    return {
+      'dry-wood': lots.filter((l) => l.materialId === 'firewood' && dry(l)).reduce((n, l) => n + l.amount.value, 0) >= fire,
+      'lamp-dish': !!lab.equipment[`eq:${LAMP_DISH_ASSEMBLY.kind}`] || lots.some((l) => l.materialId === 'fired_pot' && l.quality?.form === 3 && !l.quality?.crack),
+      oil: lots.some((l) => l.materialId === 'coconut_oil'),
+    };
+  }
+  function chapter2Tick() { for (const [k, yes] of Object.entries(chapter2Seen())) if (yes) markFirst(k); }
   function tell(kind: string, text: string, r: Resident) {
     const key = milestoneKey(kind, text), firsts = ((village as any).firsts ??= {}) as Record<string, number>;
     const first = key && firsts[key] === undefined ? key : undefined;
@@ -1420,6 +1489,18 @@ export function makeResidents(loc: any, T: any, fishNames: string[], birdNames: 
   const statVars = (r: Resident) => {
     const s = r.stats, map = Math.round(Math.min(100, visited.size / 3.2));
     return { built: s.built, notes: s.notes, shells: s.shells, map, food: s.food, deck: village.deck };
+  };
+  // the world's values a goal of its own may be checked by (R-028; the science team's first list, specs/trial1-science.md
+  // 22b34b4): given to its mind as they are now, and looked at by the world once the goal's steps are taken
+  const metricsOf = (r: Resident) => {
+    const v = statVars(r);
+    return [
+      ...(r.id === 'dot' ? [{ id: 'hut.parts', label: '小屋に取りつけた部材の数', now: v.built }, { id: 'pier.deck', label: '桟橋に張った板の数', now: v.deck }, { id: 'raft.parts', label: '筏の部材の数', now: village.raft.parts }] : []),
+      { id: 'holding', label: '手に持っている物', now: r.holding || 'なし' },
+      { id: 'notes', label: '記録の数', now: v.notes }, { id: 'shells', label: '集めた貝殻の数', now: v.shells }, { id: 'food', label: '食べた量', now: v.food },
+      { id: 'map.visited', label: '歩いて広げた地図（%）', now: v.map },
+      { id: 'isles.seen', label: '見つけた島の数', now: Object.keys(village.map.seen).length }, { id: 'isles.reached', label: 'たどり着いた島の数', now: Object.keys(village.map.reached).length },
+    ] as { id: string; label: string; now: number | string }[];
   };
   // what it saw, for its diary: only the fish it really made out (T.nearFish, ahead of its eyes, now and while it
   // grazed), never a name drawn at random; nothing seen is said as such
@@ -1558,9 +1639,14 @@ export function makeResidents(loc: any, T: any, fishNames: string[], birdNames: 
     if (night) return task('sleep', bed ?? spot(home, 60, water(1.5, 5)) ?? spot(home, 140, water(1, 8)) ?? home, 'sleep', 1800, { wet: true });
     if (bed && roughK() > 0.5 && r.hunger < 0.7 && !r.holding) return task('sleep', bed, 'sleep', 1800, { wet: true });   // (a rough sea: wedged under its ledge)
     if (r.holding) return undefined;
-    // (so hungry it cannot go on: it hauls out and lies still for a while — and grazes sooner after this)
-    if (r.hunger > NEEDS.stuckAt && day > 0.15) { troubled(r, 'stuck', `おなかがすきすぎて、動けなくなった（おなか ${full(r)}）`, '動けない'); return task('rest', spot([r.pos.x, r.pos.z], 60, shore, 120) ?? [r.pos.x, r.pos.z], 'bask', rr(5400, 9000)); }
-    if (r.hunger > eatAt(r, 0.45) && day > 0.15) {
+    // (so hungry it cannot go on: it hauls out and lies still for a while — and grazes sooner after this. Once: resting
+    // does not fill it, so for six hours after it goes to graze, still past the mark — else, after a storm left the beds
+    // thin and it past 0.95, it lay still all day, every day, and never ate: science, reviews/188-8bf9d1e kame-none.log)
+    if (r.hunger > NEEDS.stuckAt && day > 0.15 && clockMs - (r.mo.stuckAt ?? -1e15) > 6 * 3.6e6) { r.mo.stuckAt = clockMs; troubled(r, 'stuck', `おなかがすきすぎて、動けなくなった（おなか ${full(r)}）`, '動けない'); return task('rest', spot([r.pos.x, r.pos.z], 60, shore, 120) ?? [r.pos.x, r.pos.z], 'bask', rr(5400, 9000)); }
+    // (and in the evening it eats before it sleeps if it is hungry at all: the night adds near half, and a morning it woke
+    // past the mark it could not move — science, reviews/188-8bf9d1e kame-fix.log)
+    const eve = hr >= 18;
+    if (r.hunger > (eve ? Math.min(0.4, eatAt(r, 0.45)) : eatAt(r, 0.45)) && (day > 0.15 || eve)) {
       // (the bed it knows with the most grass left; it learns how they are by going)
       for (const b of beds) regrowBed(b, clockMs);
       // (a bed it went for last time without eating there — no way through, or nothing left — it leaves alone for a while)
@@ -1570,7 +1656,9 @@ export function makeResidents(loc: any, T: any, fishNames: string[], birdNames: 
       r.mo.grazeTry = bd ? { bed: bd.id, at: clockMs, hunger: r.hunger } : undefined;
       return task('graze', bd ? [bd.x, bd.z] : spot(home, 90, water(1.2, 5)) ?? spot(home, 160, water(1, 7)), 'graze', rr(2400, 4200), { wet: true, data: { bed: bd?.id } });
     }
-    if ((r.sleepy > 0.6 || Math.random() < 0.15) && day > 0.7 && hr > 10 && hr < 16.5) return task('bask', spot(home, r.sp.range, shore, 200), 'bask', rr(1500, 3600));
+    // (spells kept short — basking and watching 5 to 10 min, floating 10 min at most, looking out 30 to 120 s: the
+    // residents' days keep the real clock, so a long spell is as long for the one watching; science's caps, 2026-10-27)
+    if ((r.sleepy > 0.6 || Math.random() < 0.15) && day > 0.7 && hr > 10 && hr < 16.5) return task('bask', spot(home, r.sp.range, shore, 200), 'bask', rr(300, 600), { data: { why: r.sleepy > 0.6 ? 'sleepy' : '' } });   // (why: for its status line — sleepy, or no reason to tell: VOICE.md §9)
     return undefined;
   }
   function decide(r: Resident, hr: number): Task | null {
@@ -1584,7 +1672,7 @@ export function makeResidents(loc: any, T: any, fishNames: string[], birdNames: 
     const q = Math.random();
     // something strange lying on the beach nearby: go and look
     if (!agentOf(r) && drift.kind >= 0 && !drift.by && !r.holding && Math.hypot(drift.x - r.pos.x, drift.z - r.pos.z) < 60) { drift.by = r.id; return task('find', [drift.x, drift.z], 'pick', 6); }
-    if (!agentOf(r) && r.holding === 'drift') return task('shelve', (() => { const w = shelf.position; return [w.x + 0.6, w.z + 0.6] as [number, number]; })(), 'work', 4);
+    if (!agentOf(r) && r.holding === 'drift') { const t = shelveTask(r); if (t) return t; }
     // Lantern: a process it can run, with its material on the shelf — while it is awake (it works by its own light), hands
     // free (the world runs it)
     if (r.id === 'lantern' && !r.holding && !sleepTime(r, hr) && !village.labRuns.some((x) => x.by === r.id && lab.runs[x.runId]?.status !== 'completed' && catalog.find((c) => c.processId === x.processId)?.tend === 'stay')) {   // (only hand work keeps it: a gauge left reading, wood left a month to season, a pot left to dry do not — life-run 2026-10-09)
@@ -1614,7 +1702,7 @@ export function makeResidents(loc: any, T: any, fishNames: string[], birdNames: 
     }
     // one with a mind of its own: its own goal and steps first (its habits below, if it has nothing in mind)
     // (a typhoon forecast and agreed to: Dot hauls the raft up and takes in what crops it can, before anything else)
-    if (r.id === 'dot' && prepActive() && !r.holding) {
+    if (r.id === 'dot' && knowsPrep(r) && !r.holding) {
       if (village.raft.parts > 0 && !village.raft.hauled && Number.isFinite(village.raft.x)) return task('haul', [village.raft.x, village.raft.z], 'work', rr(40, 70));
       if (village.house.n >= ROOF_N && !village.house.weighed) { const w = atHouse(0, HD + 1.0); return task('weigh', [w.x, w.z], 'work', rr(40, 70)); }
       const early = PLOTS.find((pl) => pl.ok && pl.s === 2 && growth(pl) >= 0.6);
@@ -1639,18 +1727,18 @@ export function makeResidents(loc: any, T: any, fishNames: string[], birdNames: 
           if (wild && q < 0.4) return task('till', [wild.x + 0.8, wild.z], 'dig', rr(60, 110), { data: wild });
           const tilled = PLOTS.find((pl) => pl.ok && pl.s === 1);
           if (tilled && q < 0.45) return task('plant', [tilled.x + 0.8, tilled.z], 'pick', rr(20, 35), { data: tilled });
-          return q < 0.7 ? task('look', spot(home, 80, shore, 200), 'idle', rr(120, 400)) : task('wander', spot(home, 40, open), 'idle', rr(60, 200));   // (a rest between jobs)
+          return q < 0.7 ? task('look', spot(home, 80, shore, 200), 'idle', rr(30, 120)) : task('wander', spot(home, 40, open), 'idle', rr(60, 200));   // (a rest between jobs)
         }
         if (q < 0.7 && r.stats.built < HUT.length) {
           const it = items.nearest('wood', r.pos.x, r.pos.z, 220, r.id, clockMs);
           if (it) { items.claim(it, r.id); return task('gather', [it.x, it.z], 'pick', 3.5, { data: it }); }
-          return task('look', spot(home, 80, shore, 200), 'idle', rr(60, 180));   // nothing washed up yet: watch the sea for it
+          return task('look', spot(home, 80, shore, 200), 'idle', rr(30, 120));   // nothing washed up yet: watch the sea for it
         }
-        if (q < 0.8) return task('look', spot(home, 80, shore, 200), 'idle', rr(60, 180));
+        if (q < 0.8) return task('look', spot(home, 80, shore, 200), 'idle', rr(30, 120));
         return task('wander', spot(home, r.sp.range, open), 'idle', rr(20, 60));
       }
       case 'kame': {
-        if (q < 0.4) return task('watch', spot(home, r.sp.range, shore, 200), 'look', rr(300, 900));
+        if (q < 0.4) return task('watch', spot(home, r.sp.range, shore, 200), 'look', rr(300, 600));
         if (q < 0.75 && day > 0.3) return task('swim', spot(home, 90, (x, z, h) => h < -1.8 && h > -6), 'swim', rr(200, 500), { wet: true });
         return task('wander', spot(home, r.sp.range * 0.7, beach), 'idle', rr(60, 200));
       }
@@ -1687,7 +1775,7 @@ export function makeResidents(loc: any, T: any, fishNames: string[], birdNames: 
         if (r.holding === 'stone') return (nestWanted() ? nestTask(r) : null) ?? (ledgeWanted() ? ledgeTask(r) : null) ?? dropTask(r) ?? nestTask(r) ?? (r.holding = '', null);
         if ((nestWanted() || ledgeWanted() || wallWanted()) && q < 0.3) { const t = seaStoneTask(r, nestWanted() ? 'nest' : ledgeWanted() ? 'ledge' : 'wall'); if (t) return t; }   // (its own quiet place first, then Kamemaru's, then Dot's wall)
         if (r.holding === 'shell') return showTask(r) ?? task('pile', pileAt(r.stats.shells) as [number, number], 'pick', 3);
-        if (q < 0.35) return task('float', spot(home, 60, (x, z, h) => h < -0.8 && h > -4), 'float', rr(300, 800), { wet: true });
+        if (q < 0.35) return task('float', spot(home, 60, (x, z, h) => h < -0.8 && h > -4), 'float', rr(300, 600), { wet: true });
         if (q < 0.5) return task('groom', spot(home, 50, (x, z, h) => h < -0.8 && h > -4), 'groom', rr(90, 200), { wet: true });   // (its fur is all that keeps it warm: it grooms for hours a day)
         if (q < 0.85) {
           const it = items.nearest('shell', r.pos.x, r.pos.z, 200, r.id, clockMs);
@@ -1761,7 +1849,7 @@ export function makeResidents(loc: any, T: any, fishNames: string[], birdNames: 
       if (warn && fresh(`warn:${warn}:${x.id}`, 30)) out.push({ id: `say:warn:${warn}:${x.id}`, action: 'say', label: `${x.v.name}に「${WARN_JA[warn]}」と知らせる`, targetId: x.id });
       if (doing && fresh(`plan:${doing}:${x.id}`, 45)) out.push({ id: `say:plan:${doing}:${x.id}`, action: 'say', label: `${x.v.name}に、これから${PLAN_JA[doing]}と伝える`, targetId: x.id });
       // (help offered: Rakko, the one who brings driftwood, to Dot at work on the hut with none in hand and none asked for)
-      if (r.id === 'rakko' && x.id === 'dot' && (!r.holding || r.holding === 'wood') && x.stats.built < HUT.length && !x.holding && fresh('offer:wood:dot', 40)
+      if (r.id === 'rakko' && x.id === 'dot' && canOfferWood(r) && x.stats.built < HUT.length && !x.holding && fresh('offer:wood:dot', 40)
         && !requests.some((q) => q.from === 'dot' && q.to === 'rakko' && (q.status === 'open' || q.status === 'accepted')))
         out.push({ id: 'say:offer:wood:dot', action: 'say', label: 'ドットに「流木を運ぼうか」と申し出る', targetId: 'dot' });
       // (something new on the beach it has seen, to one who has not seen it)
@@ -1801,7 +1889,14 @@ export function makeResidents(loc: any, T: any, fishNames: string[], birdNames: 
       o.push({ id: 'wander:beach', action: 'wander', label: '浜を歩いて探す' });
       return o;
     }
-    if (r.id === 'dot' && !r.holding && r.stats.built < HUT.length && agentOf(byId.rakko) && awake(byId.rakko) && !requests.some((q) => q.from === r.id && (q.status === 'open' || q.status === 'accepted' || (q.status === 'refused' && clockMs - q.at < 10 * 60e3))))   // (not again straight after a no)
+    // (not again for an hour after a no, after a promise Rakko could not keep, or after going to ask and not finding it
+    // — Rakko is out at sea four tenths of the time — and three tries a day at most, counted from its own results so
+    // that a try that never reached Rakko counts too: asked every ten minutes, it was 24 noes a day, and counting only
+    // the asks that reached it, 112 tries: R-026, soaks 2026-10-26)
+    const askTries = a.results.filter((x) => x.optionId === 'ask:rakko:bring-wood' && clockMs - x.at < 24 * 3600e3 && x.outcome !== 'accepted' && x.outcome !== 'refused' && x.outcome !== 'interrupted');
+    if (r.id === 'dot' && !r.holding && r.stats.built < HUT.length && agentOf(byId.rakko) && awake(byId.rakko) && !requests.some((q) => q.from === r.id && (q.status === 'open' || q.status === 'accepted' || (q.status === 'refused' && clockMs - q.at < 60 * 60e3) || (q.status === 'failed' && clockMs - (q.endedAt ?? q.at) < 60 * 60e3)))
+      && requests.filter((q) => q.from === r.id && clockMs - q.at < 24 * 3600e3).length < 3
+      && askTries.length < 3 && !askTries.some((x) => x.outcome !== 'done' && clockMs - x.at < 60 * 60e3))
       o.push({ id: 'ask:rakko:bring-wood', action: 'ask', label: 'ラッコに流木を届けてほしいと頼む', targetId: 'rakko' });
     if (!r.holding) for (const it of items.list) if (it.kind === 'wood' && (!it.by || it.by === r.id) && known(`wood#${it.id}`) && !((it.away?.[r.id] ?? 0) > clockMs)) o.push({ id: `gather:wood#${it.id}`, action: 'gather', label: `流木を拾う（${Math.round(Math.hypot(it.x - r.pos.x, it.z - r.pos.z))}m）`, targetId: `wood#${it.id}` });
     // (steps that become possible later are offered too, for planning, marked with what they need)
@@ -1820,7 +1915,9 @@ export function makeResidents(loc: any, T: any, fishNames: string[], birdNames: 
     if (r.id === 'dot' && patches.filter((p) => p.by).length < 3) o.push({ id: 'reef:sea', action: 'reef', label: '流木を沈めて漁礁をつくる（ラッコの海）', targetId: 'sea', ...(r.holding === 'wood' ? {} : { ready: false, needs: '流木を持っている' }) });
     if (r.id === 'dot' && !r.holding) for (const b of beds) if (b.grass < 0.5 && !(b.replanted && clockMs < b.replanted)) { o.push({ id: `replant:${b.id}`, action: 'replant', label: `荒れた藻場を植え直す（カメマルの藻場、海草 ${Math.round(b.grass * 100)}%）`, targetId: b.id }); break; }
     if (r.stats.built < HUT.length) o.push({ id: 'place:hut', action: 'place', label: `部材を小屋に取りつける（${r.stats.built + 1}/${HUT.length}）`, targetId: 'hut', ...(r.holding === 'piece' ? {} : { ready: false, needs: '削った部材を持っていること' }) });
-    if (r.id === 'dot' && r.holding === 'piece' && !pieceWanted(r)) o.push({ id: 'stow:bench', action: 'stow', label: `削った部材を作業台の脇に置いておく（あとで使う。いま${village.spare}本）`, targetId: 'bench' });
+    // (set down whenever the hut and the raft do not want it — the house takes its pieces from the bench too: else, with
+    // no mind to build the house, a piece the house wanted stayed in hand and no tree was felled — science, stall2c.log)
+    if (r.id === 'dot' && r.holding === 'piece' && r.stats.built >= HUT.length && !(village.raft.parts < RAFT_N && Object.keys(village.map.seen).length > 0)) o.push({ id: 'stow:bench', action: 'stow', label: `削った部材を作業台の脇に置いておく（あとで使う。いま${village.spare}本）`, targetId: 'bench' });
     if (r.id === 'dot' && !r.holding && village.spare > 0 && pieceWanted(r)) o.push({ id: 'take:bench', action: 'take', label: `作業台の脇に置いた部材を手に取る（${village.spare}本）`, targetId: 'bench' });
     if (!r.holding && drift.kind >= 0 && !drift.by && known('drift')) o.push({ id: 'find:drift', action: 'find', label: '浜の見慣れないものを拾って調べる', targetId: 'drift' });
     o.push({ id: 'shelve:shelf', action: 'shelve', label: '見つけたものを棚に飾る', targetId: 'shelf', ...(r.holding === 'drift' ? {} : { ready: false, needs: '見つけたものを持っていること' }) });
@@ -1846,6 +1943,8 @@ export function makeResidents(loc: any, T: any, fishNames: string[], birdNames: 
       o.push({ id: 'wall:next', action: 'wall', label: `家の風上（南東）に石垣を積む（${village.wall.n + 1}/${WALL_N}。できると台風でも茅が飛ばない）`, targetId: 'house', ...(r.holding === 'stone' ? {} : { ready: false, needs: village.wall.pile ? '浜の石置き場から石を持ってくること' : '石（ラッコが海の底から浜の石置き場に運んでくる）' }) });
       if (!r.holding && village.wall.pile > 0) o.push({ id: 'wallfetch:beach', action: 'wallfetch', label: `浜の石置き場から石を取ってくる（いま${village.wall.pile}個）`, targetId: 'stones' });
     }
+    // (to burn: when the pots or the oil want wood — an オオハマボウ, felled for its branches)
+    if (r.id === 'dot' && r.stats.built >= HUT.length && !r.holding && woodWanted()) { const t = fuelTree(r); if (t) o.push({ id: `fuel:${t.x.toFixed(2)},${t.z.toFixed(2)}`, action: 'fuel', label: `薪にするため、林の${KIND_JA[t.kind]}を切り倒す（高さ約${Math.round(t.h)}m、${Math.round(t.d)}m先。枝が薪になり、切った株からまた芽が出る）`, targetId: 'tree' }); }
     if (r.id === 'dot' && r.stats.built >= HUT.length && !r.holding) for (const t of fellable(r)) {
       const ww = windward(t.x, t.z);
       o.push({ id: `fell:${t.x.toFixed(2)},${t.z.toFixed(2)}`, action: 'fell', label: `林の木を切り倒す（${KIND_JA[t.kind] ?? '木'}、高さ約${Math.round(t.h)}m、${Math.round(t.d)}m先。丸太${t.h > 7 ? 3 : 2}本と薪、切った所は開けた土地になる${ww ? '。家の風上（南東）の木：防風林が薄くなる' : ''}）`, targetId: `forest:${t.x.toFixed(1)},${t.z.toFixed(1)}` });
@@ -1880,11 +1979,11 @@ export function makeResidents(loc: any, T: any, fishNames: string[], birdNames: 
     else if (action === 'nest') t = nestTask(r);
     else if (action === 'ledge') t = ledgeTask(r);
     else if (action === 'stonedrop') t = dropTask(r);
-    else if (action === 'fell') { const [x, z] = target.split(',').map(Number); t = fellTask(x, z); }
+    else if (action === 'fell' || action === 'fuel') { const [x, z] = target.split(',').map(Number); t = fellTask(x, z); if (t && action === 'fuel') t.data.fuel = 1; }
     else if (action === 'twist') t = task('twist', benchStand(), 'work', rr(60, 90));
     else if (action === 'cut') t = r.holding ? null : cutTask();
     else if (action === 'find') { if (drift.kind < 0 || drift.by) return null; drift.by = r.id; t = task('find', [drift.x, drift.z], 'pick', 6); }
-    else if (action === 'shelve') t = r.holding === 'drift' ? task('shelve', [shelf.position.x + 0.6, shelf.position.z + 0.6], 'work', 4) : null;
+    else if (action === 'shelve') t = shelveTask(r);
     else if (action === 'chop') { const tr = TREES[+target.split('#')[1]]; t = tr && tr.ok && !tr.down ? task('chop', [tr.x + 0.9, tr.z + 0.3], 'chop', rr(40, 70), { data: tr }) : null; }
     else if (action === 'till' || action === 'plant' || action === 'harvest') {
       const pl = PLOTS[+target.split('#')[1]], want = action === 'till' ? 0 : action === 'plant' ? 1 : 2;
@@ -1912,7 +2011,7 @@ export function makeResidents(loc: any, T: any, fishNames: string[], birdNames: 
     else if (action === 'pile') t = r.holding === 'shell' ? task('pile', pileAt(r.stats.shells) as [number, number], 'pick', 3) : null;
     else if (action === 'show') { const f = byId[target]; t = f && r.holding === 'shell' ? task('show', [f.pos.x, f.pos.z], 'look', 5.5, { data: f.id }) : null; if (t) { showCool = 120; shownTo[f.id] = clockMs + rr(3, 8) * 60e3; } }
     else if (action === 'post') t = r.holding === 'wood' && village.pier === 'build' && village.posts < village.bases ? task('post', pileStand(village.posts, true), 'work', 8, { wet: true }) : null;
-    else if (action === 'float') t = task('float', spot(home, 60, (x, z, h) => h < -0.8 && h > -4), 'float', rr(300, 800), { wet: true });
+    else if (action === 'float') t = task('float', spot(home, 60, (x, z, h) => h < -0.8 && h > -4), 'float', rr(300, 600), { wet: true });
     else if (action === 'groom') t = task('groom', spot(home, 50, (x, z, h) => h < -0.8 && h > -4), 'groom', rr(90, 200), { wet: true });
     else if (action === 'soak' || action === 'takeout') { const p = husk.sites().pool; t = task(action === 'soak' ? 'husk-soak' : 'husk-takeout', p.stand ?? [p.x, p.z], 'pick', 4); }   // (on the dry spot by the pool, reaching in)
     else if (action === 'beat') { const w = husk.sites().work; t = task('husk-beat', [w.x, w.z], 'work', 900, { data: {} }); }   // (a quarter hour at most at a time; the rest another time)
@@ -1934,7 +2033,7 @@ export function makeResidents(loc: any, T: any, fishNames: string[], birdNames: 
       else if (['harvest', 'split', 'weave', 'mast', 'resume'].includes(target)) t = task('sail-work', [s.x, s.z], 'work', 900, { data: { op: target, place } });   // (a quarter hour at most at a time)
     }
     else if (action === 'charge') t = task('charge', spot(home, 30, open), 'idle', rr(600, 1400));
-    else if (action === 'look') t = task('look', spot(home, 80, shore, 200) ?? spot(home, 40, open), 'idle', rr(60, 180));
+    else if (action === 'look') t = task('look', spot(home, 80, shore, 200) ?? spot(home, 40, open), 'idle', rr(30, 120));
     else if (action === 'wander') t = task('wander', spot(home, r.sp.range, target === 'beach' ? beach : open), 'idle', rr(20, 60));
     if (t) t.opt = id;
     return t;
@@ -1994,11 +2093,28 @@ export function makeResidents(loc: any, T: any, fishNames: string[], birdNames: 
       const r = byId.dot;
       { const ph = photoHabit(r, opts); if (ph && !r.holding) return ph; }
       { const sp = has('say:warn:'); if (sp) return { text: '天気を知らせる', why: '近くに相手がいる', plan: [sp] }; }
+      // (the raft and the crossing by habit too, not only when its mind thinks of them: without them, with the model away,
+      // no raft was lashed and no crossing came in 72 hours — science on #177. The hut first: once it is up, a piece in
+      // hand goes to the raft while the raft is not whole and an island is on the map (with the raft first, the crossing
+      // came at 4–9 hours and ended chapter 1 with the hut at 6–12 pieces; the hut first, at 30–33 hours, as a mind of its
+      // own does — science on #185); the raft whole, it crosses to an island it has seen on a clear day, after the morning
+      // gathering and back by daylight (voyageHour) — not again within three hours of the world turning it back)
+      const raftWanted = r.stats.built >= HUT.length && village.raft.parts < RAFT_N && Object.keys(village.map.seen).length > 0;
+      { const vo = opts.find((o) => o.id.startsWith('voyage:') && o.ready !== false && !village.map.reached[o.targetId!])?.id, w = islandWeather(clockMs), back = clockMs - (r.voyageNoAt ?? -Infinity) < 3 * 3.6e6;   // (kept apart: its results are the last sixty, an hour's worth of short spells)
+        if (vo && !back && (!w || (w.cloud < 0.6 && w.rain < 0.1))) return { text: '筏で島へ渡る', why: '筏ができて、晴れている', plan: [vo] }; }
+      if (raftWanted && has('lash:')) return { text: '部材を筏に組む', why: '削った部材があり、見えた島へ渡る筏が要る', plan: ['lash:raft'] };
       if (has('place:')) return { text: '小屋に部材を取りつける', why: '削った部材がある', plan: ['place:hut'] };
-      if (has('craft:')) return { text: '流木を部材にする', why: '流木を持っている', plan: ['craft:bench', 'place:hut'] };
+      // (a piece in hand with nowhere to go — the hut and the raft whole — is set down by the bench: its hands free for the
+      // axe. Held, no tree could be felled, and the jars waited unfired for days: science, reviews/195-5ccc3a5 stall2c.log)
+      if (has('stow:')) return { text: '部材を作業台に置いておく', why: '削った部材を持っているが、いま使う所がない', plan: ['stow:bench'] };
+      if (has('craft:')) return { text: '流木を部材にする', why: '流木を持っている', plan: ['craft:bench', raftWanted ? 'lash:raft' : 'place:hut'] };
       if (has('shelve:')) return { text: '見つけたものを棚に置く', why: '手に持っている', plan: ['shelve:shelf'] };
       if (has('find:')) return { text: '見慣れないものを調べる', why: '浜で見かけた', plan: ['find:drift', 'shelve:shelf'] };
       if (has('charge:') && r.battery < 0.3) return { text: '充電する', why: '電池が少ない', plan: ['charge:sun'] };
+      // (a clear morning with islands not yet on its map: it looks out from the beach and marks them — by habit too, not
+      // only when its mind thinks of it; without it no raft was ever wanted and no crossing came: science's 72 h, 2026-10-27)
+      { const sv = has('survey:'), h = localHour(clockMs), w = islandWeather(clockMs);
+        if (sv && h >= 6 && h < 10 && (!w || (w.cloud < 0.6 && w.rain < 0.1))) return { text: '水平線を見渡す', why: '晴れた朝で、遠くの島が見えそう', plan: [sv] }; }
       if (r.stats.built < HUT.length) {
         // (the nearest log it knows of)
         const g = opts.filter((o) => o.action === 'gather').sort((x, y) => { const p = (o: Option) => a.seen.get(o.targetId!); const dx = p(x), dy = p(y); return (dx ? Math.hypot(dx.x - r.pos.x, dx.z - r.pos.z) : 1e9) - (dy ? Math.hypot(dy.x - r.pos.x, dy.z - r.pos.z) : 1e9); })[0];
@@ -2007,6 +2123,17 @@ export function makeResidents(loc: any, T: any, fishNames: string[], birdNames: 
         if (has('ask:') && Math.random() < 0.35) return { text: 'ラッコに流木を頼む', why: '小屋の材料が見つからない', plan: [has('ask:')!] };
         return { text: '流木を探す', why: '小屋の材料が要る', plan: [Math.random() < 0.7 ? 'look:shore' : 'wander:near'] };
       }
+      // (the hut up and the raft not yet whole: pieces for it — one put by at the bench first, else a log it knows of)
+      if (raftWanted) {
+        if (has('take:')) return { text: '筏に部材を組む', why: '作業台の脇に部材を置いてある', plan: ['take:bench', 'lash:raft'] };
+        const g = opts.filter((o) => o.action === 'gather')[0];
+        if (g) return { text: '筏の部材を作る', why: '見えた島へ渡る筏が要る', plan: [g.id, 'craft:bench', 'lash:raft'] };
+      }
+      // (wood for the next pit fire, by habit too: pots waiting to be fired, less than a fire's dry wood (30 kg) and less
+      // green wood than a drying pile takes (45 kg, p15x) — it fells a tree near the hut (to its lee first) or a sapling,
+      // and the branches go by the shelf for Lantern to pile and dry. Without it, with the model away, the pots dried at
+      // 74 hours and nothing more was made for 30 days: science, reviews/188-8bf9d1e stall-none.log)
+      { const why = woodWanted(), f = why && has('fuel:'); if (f) return { text: '薪にする木を切る', why, plan: [f] }; }
       const farm = has('harvest:') ?? has('chop:') ?? has('till:') ?? has('plant:');
       if (farm) return { text: '畑の世話をする', why: '小屋が建ったので', plan: [farm] };
       return { text: 'ひと休みする', why: '今はすることがない', plan: [Math.random() < 0.7 ? 'look:shore' : 'wander:near'] };
@@ -2018,6 +2145,7 @@ export function makeResidents(loc: any, T: any, fishNames: string[], birdNames: 
   // (what another told it, and then worked: talking is of use — learnt, a little more each time)
   for (const r of list) {
     const a = agents[r.id]; if (!a) continue;
+    a.measure = (m) => metricsOf(r).find((x) => x.id === m)?.now;
     a.onUseful = (from, opt) => {
       r.stats.talkUse = Math.min(1, (r.stats.talkUse ?? 0) + 0.25); a.values.bonus(`heard:${from}`, `${byId[from]?.v.name ?? from}から聞いた情報`, 0.5);
       r.diary.push({ at: clockMs, text: `${byId[from]?.v.name ?? from}から聞いた情報で、${opt.split(':')[0] === 'gather' ? '拾えた' : 'できた'}（${opt}）`, key: 'mind' }); if (r.diary.length > 800) r.diary.shift();
@@ -2039,6 +2167,27 @@ export function makeResidents(loc: any, T: any, fishNames: string[], birdNames: 
   const agentOf = (r: Resident) => agents[r.id] as Agent | undefined;
   // what they have asked of each other (kept by the world: ADR 0004 §6)
   const requests: Request[] = [];
+  // (Rakko offering Dot wood (R-026): only with wood in hand or some it knows of to pick up — not an offer it has nothing
+  // to keep it with; not soon after saying no to Dot's own asking, nor soon after a promise it could not keep)
+  function canOfferWood(rk: Resident): boolean {
+    if (rk.holding && rk.holding !== 'wood') return false;
+    const a = agentOf(rk);
+    const some = rk.holding === 'wood' || items.list.some((it: any) => it.kind === 'wood' && (!it.by || it.by === rk.id) && (!a || a.seen.has(`wood#${it.id}`)) && !((it.away?.[rk.id] ?? 0) > clockMs));
+    return some && !requests.some((q) => q.from === 'dot' && q.to === rk.id && ((q.status === 'refused' && clockMs - q.at < 30 * 60e3) || (q.status === 'failed' && clockMs - (q.endedAt ?? q.at) < 40 * 60e3)));
+  }
+  // (a promise that cannot be kept is let go (R-026): three tries at handing over that came to nothing, or an hour on the
+  // world's clock — closed as not kept, and the reason told back to both, as a result of their own; the same offer
+  // not again for a while)
+  function failRequest(q: Request, why: string) {
+    q.status = 'failed'; q.reason = why; q.endedAt = clockMs;
+    const to = byId[q.to], from = byId[q.from], ta = agentOf(to), fa = agentOf(from);
+    to.diary.push({ at: clockMs, text: `${from.v.name}に流木を届けられなかった（${why}）`, key: 'mind' });
+    from.diary.push({ at: clockMs, text: `${to.v.name}は流木を届けられなかった（${why}）`, key: 'mind' });
+    if (ta) { ta.result(`give:${q.from}`, 'give', 'unavailable', clockMs, `${from.v.name}との約束を果たせなかった：${why}`); flushMind(to, ta); }
+    if (fa) { fa.result(`ask:${q.to}:${q.what}`, 'ask', 'unavailable', clockMs, `${to.v.name}は流木を届けられなかった：${why}`); flushMind(from, fa); }
+    (to.saidAt ??= {})[`offer:wood:${q.from}`] = clockMs;
+    tell('answer', `${to.v.name}は${from.v.name}に流木を届けられなかった`, to);
+  }
   let reqN = 0;
   // what they say to each other as they ask, answer, hand over and tell (ADR 0006, the island's language, step 3):
   // a meaning, made into Lumau with its Japanese and English (lumau/frames.ts), said a moment apart
@@ -2094,10 +2243,12 @@ export function makeResidents(loc: any, T: any, fishNames: string[], birdNames: 
   }
   const PIT_NEEDS = clayPitMaterials(CLAY_PIT_PLAN);
   const rawClayOnShelf = () => shelfLots().filter((l) => l.materialId === 'raw_clay' && !(l as any).reservedBy).reduce((n, l) => n + l.amount.value, 0);
-  /** Lantern digs the pit when there is a roof to put it under, clay enough for its lining and still some to soak, and
+  /** Lantern digs the pit (by the hut, a shade of leaves over it) when there is clay enough for its lining and still some to soak, and
    *  rain water to soak it in. */
   function pitTask(): Task | null {
-    if (village.clayPit || !roofDone() || !village.catcher || rawClayOnShelf() < PIT_NEEDS.rawClayMg + 1e6) return null;
+    // (not waiting for the hut's roof: a shade of leaves over it is enough — waiting for the eighteen pieces of the roof,
+    // the first crossing came before the pit, and the clay brought over never ran short: science's 72 h, 2026-10-27)
+    if (village.clayPit || !village.catcher || rawClayOnShelf() < PIT_NEEDS.rawClayMg + 1e6) return null;
     const w = atHut(0.2, 1.3); return task('pit', [w.x, w.z], 'dig', Math.max(60, PIT_NEEDS.handSeconds - ((village as any).pitDug ?? 0)), {});   // (what is left of the digging)
   }
   function digPit(r: Resident) {
@@ -2113,7 +2264,7 @@ export function makeResidents(loc: any, T: any, fishNames: string[], birdNames: 
     lab.equipment[`eq:${CLAY_PIT}`] = { equipmentId: `eq:${CLAY_PIT}`, kind: CLAY_PIT, catalogEntry: CLAY_PIT, catalogVersion: SCIENCE_CATALOG_VERSION, condition: 1, params };
     village.clayPit = { at: clockMs, diameterCm: CLAY_PIT_PLAN.diameterCm, depthCm: CLAY_PIT_PLAN.depthCm };
     drawPit(); drawStore();
-    note(r, 'pit', {}, `小屋の屋根の下に粘土の池を掘った（直径${CLAY_PIT_PLAN.diameterCm}cm・深さ${CLAY_PIT_PLAN.depthCm}cm。生の粘土${Math.round(PIT_NEEDS.rawClayMg / 1e6)}kgで底と壁を踏み固めた。入るのは約${Math.round(params.capacityMl / 1000)}L）`);
+    note(r, 'pit', {}, `小屋のそばに、葉の日よけをかけて粘土の池を掘った（直径${CLAY_PIT_PLAN.diameterCm}cm・深さ${CLAY_PIT_PLAN.depthCm}cm。生の粘土${Math.round(PIT_NEEDS.rawClayMg / 1e6)}kgで底と壁を踏み固めた。入るのは約${Math.round(params.capacityMl / 1000)}L）`);
     tell('pit', `${r.v.name}が粘土の池を掘った。粘土を浸せるようになった`, r);
     return true;
   }
@@ -2128,6 +2279,23 @@ export function makeResidents(loc: any, T: any, fishNames: string[], birdNames: 
   const inputThere = (e: CatalogEntry) => !e.input || shelfLots().some((l) => l.materialId === e.input && !(l as any).reservedBy && l.amount.value >= (e.minInputMg ?? 0) && (!e.inputOk || e.inputOk(l)));
   const recipeWanted = () => TOOLS.find((t) => !lab.equipment[`eq:${t.kind}`] && catalog.some((e) => e.ready && e.built === t.kind && inputThere(e))
     && t.materials.every((m) => shelfLots().some((l) => l.materialId === m.materialId && !(l as any).reservedBy && canTakeMass(l, m.mg))));
+  // (firewood wanted for the pots waiting to be fired, and for the oil — milk waiting, the cook pot standing and not clear
+  // oil enough on the shelf: less dry wood than a pit fire takes and a boil takes, and less green wood than a drying pile
+  // takes — every lot counted, a pile drying among them; the science side's numbers, process-catalog.ts. Without the oil's,
+  // the pit fire took the dry wood and the boil had none: science, reviews/192-193 oil-none-1.log. Why, in the habit's
+  // words; '' when no wood is wanted)
+  const woodWanted = (): string => {
+    const all = Object.values(lab.lots), boil = catalog.find((e) => e.enough === 'coconut_oil' && !!e.input);
+    const pots = all.some((l) => l.materialId === 'dry_pot' || l.materialId === 'green_pot');
+    const oil = !!boil && !!lab.equipment[`eq:${boil.built}`] && all.some((l) => l.materialId === boil.input)
+      && !shelfLots().some((l) => l.materialId === 'coconut_oil' && !(l as any).reservedBy && (l.quality?.soaked_in_dish ?? 0) !== 1 && l.amount.value >= (boil.enoughMg ?? 0));
+    if (!pots && !oil) return '';
+    const wood = all.filter((l) => l.materialId === 'firewood'), seasoned = (l: LotView) => (l.quality?.water_ppm ?? 1e6) <= SEASONED_PPM;
+    const fire = catalog.find((e) => e.input === 'dry_pot')?.also?.find((x) => x.input === 'firewood')?.minMg ?? 30e6, pile = catalog.find((e) => e.built === 'firewood_stack')?.minInputMg ?? 45e6;
+    const need = (pots ? fire : 0) + (oil ? boil!.also?.find((x) => x.input === 'firewood')?.minMg ?? 2e6 : 0);
+    const dry = wood.filter((l) => seasoned(l as LotView)).reduce((n, l) => n + l.amount.value, 0), wet = wood.filter((l) => !seasoned(l as LotView)).reduce((n, l) => n + l.amount.value, 0);
+    return dry < need && wet < pile ? (pots ? '次の野焼きの乾いた薪が足りない' : 'ヤシ油を煮る乾いた薪が足りない') : '';
+  };
   // (wet and seasoned wood in piles of their own: a dried pile is not wetted again by green branches)
   const freeWood = () => { const all = shelfLots().filter((l) => l.materialId === 'firewood' && !(l as any).reservedBy) as LotView[], dry = (l: LotView) => (l.quality?.water_ppm ?? 1e6) <= SEASONED_PPM; const wet = all.filter((l) => !dry(l)), dried = all.filter(dry); return wet.length >= 2 ? wet : dried.length >= 2 ? dried : wet; };
   const potForCook = () => !lab.equipment[`eq:${COOK_POT_ASSEMBLY.kind}`] ? shelfLots().find((l) => l.materialId === 'fired_pot' && !(l as any).reservedBy && [1, 2].includes(l.quality?.form ?? 0) && !(l.quality?.crack)) : undefined;
@@ -2203,7 +2371,8 @@ export function makeResidents(loc: any, T: any, fishNames: string[], birdNames: 
     const dg = [...out].reverse().find((c) => c.diagnostics && (c.diagnostics as any).lumenSeconds !== undefined)?.diagnostics as any;
     const x = (village as any).lampFiber as number | undefined;
     if (dg && x) { village.lampLog.push({ at: clockMs, fiber: x, lumenS: Math.round(dg.lumenSeconds ?? 0), litS: Math.round(dg.litSeconds ?? 0), soot: 0 }); if (village.lampLog.length > 60) village.lampLog.shift(); }
-    if (status === 'completed' && village.lampLog.length === 1 && (dg?.litSeconds ?? 0) > 0) tell('science', `${by?.v.name ?? 'ランタン'}が、島で初めて灯りをともした。焼いた灯皿に、島のヤシ油と、自分でよった芯で`, by);
+    // (the first lamp that burned, though the first try did not: none lit before it — science, specs/chapter1-world-values.md §2)
+    if (status === 'completed' && (dg?.litSeconds ?? 0) > 0 && firstsOf().light === undefined) tell('science', `${by?.v.name ?? 'ランタン'}が、島で初めて灯りをともした。焼いた灯皿に、島のヤシ油と、自分でよった芯で`, by);
     drawLamp();
   }
   // the dish in the hut, and its flame while a lamp burns
@@ -2262,6 +2431,18 @@ export function makeResidents(loc: any, T: any, fishNames: string[], birdNames: 
   }
   /* ---------- Lantern's processes (the science core, run by the world) ---------- */
   const shelfStand = (): [number, number] => { const w = atHut(1.6, -3.2); return [w.x, w.z]; };   // (in front of the shelf, clear of the hut: room for Lantern's wide body)
+  // (a find carried to the shelf: to its stand, where there is room — the corner it went to before was walled in by what
+  // was built by the shelf, and Lantern carried a find for days, its hands full, the pit fire waiting: science,
+  // reviews/201-f18a02d. Three tries that did not get there, and it is set down where it is, kept with the finds all the
+  // same: its hands free)
+  function shelveTask(r: Resident): Task | null {
+    if (r.holding !== 'drift') return null;
+    if ((r.mo.shelveTries = (r.mo.shelveTries ?? 0) + 1) <= 3) return task('shelve', shelfStand(), 'work', 4);
+    const what = drift.kind >= 0 ? DRIFT[drift.kind].ja : '見つけたもの';
+    r.holding = ''; r.mo.shelveTries = 0; village.treasures.push({ what, who: r.v.name, at: clockMs }); drift.kind = -1; drift.t = 0; drawShelf();
+    note(r, 'find', { thing: what }, `${what}を棚まで運べなかったので、その場に置いた`);
+    return null;
+  }
   /** The catalog entry a run or a task meant (two entries can share a process: the pot shaped as a cook pot or a lamp dish). */
   const entryOf = (processId: string, key?: string) => catalog.find((c) => c.processId === processId && (!key || c.key === key)) ?? catalog.find((c) => c.processId === processId);
   /** How many pots of a form are on their way (shaped, drying, fired, not yet made into anything). */
@@ -2288,6 +2469,10 @@ export function makeResidents(loc: any, T: any, fishNames: string[], birdNames: 
       if (entry.form === 2) { const ml = entry.start?.params.capacityMl; if (jarsOf(ml) >= 1 || (ml !== SEAL_JAR_ML && lab.equipment[`eq:${RETORT_ASSEMBLY.kind}`]) || (ml === SEAL_JAR_ML && weatherPotOnItsWay())) return []; }
       // (the bamboo tube: one, for the weather pot, while there is none — not once a jar is sealed with one)
       if (entry.processId === 'p18x_bamboo_tube' && weatherPotOnItsWay()) return [];
+      // (a fire tended by hand is not lit when its tender would soon be called away — to a gathering, or to bed: left, it is
+      // stopped half done. The boil begun before the evening gathering was stopped at 18:54: science, reviews/192-193
+      // oil-none-1.log. Three quarters of an hour: a pit fire takes some thirty minutes)
+      if (entry.tend === 'stay' && [entry.equipment, ...(entry.moreEquipment ?? [])].some((q) => q?.kind === 'open_fire_pit') && calledSoon(byId.lantern, 0.75)) return [];
       // (the lamp at dusk, on the island's own hours: lit as the light goes, not in the afternoon)
       if (entry.when === 'dusk') { const hr = localHour(clockMs); if (hr < 18.3 || hr > 20.5) return []; }
       // (the oil soaked into the dish's wall goes in with the dish: it is the dish's, kept where the dish is)
@@ -2381,7 +2566,7 @@ export function makeResidents(loc: any, T: any, fishNames: string[], birdNames: 
   }
   /** Step the running processes as far as now, and tell what came of the ones that ended. */
   function tickLab() {
-    hypoTick(); swellTick();
+    hypoTick(); swellTick(); swellWatch(); prepOver();
     for (const x of [...village.labRuns]) {
       const run = lab.runs[x.runId], e = entryOf(x.processId, x.key), by = byId[x.by];
       if (!run || !e) { village.labRuns.splice(village.labRuns.indexOf(x), 1); continue; }
@@ -2397,8 +2582,29 @@ export function makeResidents(loc: any, T: any, fishNames: string[], birdNames: 
         for (let at = x.startOnClock + fo.fromMs; at <= Math.min(now, x.startOnClock + fo.lastMs) && !x.outAt; at += fo.everyMs) if (at >= run.lastTo) feel.push({ at, action: fo.action });
         feel.push({ at: x.outAt ?? x.startOnClock + fo.lastMs, action: 'take_out' });
       }
+      // (watched, while its tender is there: a request a look long, each look read before the next — the fire lowered, the
+      // pot taken off, at the start of the one after the look that says so)
+      const w = e.watch, watched = (): Committed[] => {
+        const res: Committed[] = [];
+        for (let k = 0; k < 120; k++) {
+          const from = lab.runs[x.runId]?.lastTo, then = x.next ?? [], off = then.some((a) => a.action === w!.out);
+          const req = from === undefined ? null : nextRequest(lab, x.runId, { realNow: clockMs, environment: (at) => envFor(e, at), energy: e.energy, maxMs: w!.everyMs,
+            actions: [...then.map((a) => ({ ...a, at: from })), ...(off ? [] : [{ at: from + w!.everyMs - 1, action: w!.action }])] });
+          if (!req) break;
+          x.next = [];
+          const c = commit(lab, req, e.step(req)); res.push(c);
+          if (!c.ok || off || !['starting', 'running'].includes(c.status ?? '')) break;
+          for (const o of c.observations ?? []) {
+            if (!o.text) continue;
+            const say = (what: string) => by?.diary.push({ at: toReal(e.clock, o.at), text: `${e.ja}：${o.text}。${what}`, key: 'study' });
+            if (w!.lower && !x.lowered && w!.lower.when.some((t) => o.text!.includes(t))) { x.lowered = 1; x.next.push({ action: w!.lower.action, params: w!.lower.params }); say('火を弱めた'); }
+            if (!x.next.some((a) => a.action === w!.out) && w!.ready.some((t) => o.text!.includes(t))) { x.next.push({ action: w!.out }); say('鍋を火から下ろした'); }
+          }
+        }
+        return res;
+      };
       // (the start's action — what to make — falls in the first request only)
-      const out = advance(lab, x.runId, e.step, { realNow: clockMs, environment: (at) => envFor(e, at), energy: e.tend === 'stay' && !tending ? (e.energy ? (f: number, t: number) => e.energy!(f, t).map((o) => ({ ...o, maxJ: 0 })) : undefined) : e.energy,   // (hands taken away: offered, but nothing)
+      const out = w && tending ? watched() : advance(lab, x.runId, e.step, { realNow: clockMs, environment: (at) => envFor(e, at), energy: e.tend === 'stay' && !tending ? (e.energy ? (f: number, t: number) => e.energy!(f, t).map((o) => ({ ...o, maxJ: 0 })) : undefined) : e.energy,   // (hands taken away: offered, but nothing)
         actions: [...(e.start ? [{ at: x.startOnClock, action: e.start.action, params: e.start.params }] : []), ...(e.steps ?? []).map((q) => ({ at: x.startOnClock + q.afterMs, action: q.action })), ...(e.finish ? [{ at: x.startOnClock + e.finish.afterMs, action: e.finish.action }] : fo ? feel : reads)], ...(e.gauge ? { maxMs: 3_600_000 } : {}), ...(e.tend === 'stay' && !tending ? { stop: 'operator' as const } : {}) });
       if (tending && lab.runs[x.runId]?.status !== 'running' && lab.runs[x.runId]?.status !== 'starting') by.task!.t = by.task!.dur;   // (its hand work done: it is free)
       if (fo) for (const c of out) for (const o of c.observations ?? []) {
@@ -2426,14 +2632,19 @@ export function makeResidents(loc: any, T: any, fishNames: string[], birdNames: 
       // (the lamp's: the oil soaked into the dish's wall stays with the dish; the water that sat under the oil is poured off
       // into a jar of its own, kept apart from the oil and the rain water, and accounted; the rest goes back to the shelf)
       for (const p of ended.produced ?? []) {
+        // (chapter 1's way: a pot fired, not cracked — a cook pot's or a lamp dish's alike; one cracked later stays so)
+        if (ended.status === 'completed' && p.materialId === 'fired_pot' && !p.quality?.crack && firstsOf()['fired-pot'] === undefined) tell('science', `${by?.v.name ?? 'ランタン'}の野焼きで、島で初めて器が焼けた`, by ?? byId.lantern);
         if (isLamp && p.materialId === 'coconut_oil' && p.quality?.soaked_in_dish === 1) continue;
         if (isLamp && p.materialId === 'process_water') { p.location = 'jar:lamp'; continue; }
         if (p.location !== 'shelf') p.location = 'shelf';
       }
       if (isLamp) lampDone(by, ended.status!, out);
-      const seen = run.observations.map((o) => o.text ?? (o.quantity ? `${o.quantity} ${o.value}${o.unit ?? ''}` : '')).filter(Boolean).slice(0, 3).join('、');
+      // (what it noticed, each once: the first few — a watched one's, the last, as the pot was when it came off)
+      const noticed = [...new Set(run.observations.map((o) => o.text ?? (o.quantity ? `${o.quantity} ${o.value}${o.unit ?? ''}` : '')).filter(Boolean))], seen = (e.watch ? noticed.slice(-3) : noticed.slice(0, 3)).join('、');
       const made = (ended.produced ?? []).map((p) => `${MATERIAL_JA[p.materialId] ?? p.materialId} ${+(p.amount.value / 1000).toFixed(1)}g`).join('・');
-      const text = ended.status === 'completed' ? `${e.ja}：できた（${made || '変化を記録'}）${seen ? `。気づいたこと：${seen}` : ''}` : ended.status === 'stopped' ? `${e.ja}：途中でやめた（材料はそのまま）` : `${e.ja}：うまくいかなかった（${run.why ?? '理由不明'}）`;
+      // (stopped, what it left is told as it is — a boil stopped has made its oil: science read "the materials as they were"
+      // and took the oil for not made, reviews/192-193)
+      const text = ended.status === 'completed' ? `${e.ja}：できた（${made || '変化を記録'}）${seen ? `。気づいたこと：${seen}` : ''}` : ended.status === 'stopped' ? `${e.ja}：途中でやめた（${made ? `あとに残ったもの：${made}` : '材料はそのまま'}）` : `${e.ja}：うまくいかなかった（${run.why ?? '理由不明'}）`;
       if (by) by.diary.push({ at: clockMs, text, key: 'study' });
       tell('science', `${by?.v.name ?? ''}の工程：${text}`, by);
       if (by?.task?.kind === 'lab' && by.task.data?.runId === x.runId) by.task.t = by.task.dur;
@@ -2445,7 +2656,7 @@ export function makeResidents(loc: any, T: any, fishNames: string[], birdNames: 
       who: r.id, profile: profileOf(r), why: a.why || '次にすることを決める',
       now: { at: clockMs, hour: +hr.toFixed(1), island: islandNow(), ...(r.id === 'dot' ? { map: mapNow() } : {}), ...((r.id === 'dot' || r.id === 'lantern') && shelfLots().length ? { store: storeNow() } : {}), ...(r.id === 'lantern' && village.hypo ? { guess: hyps().map((h) => ({ 考え: h.kind === 'day' ? `気圧計が前の日の同じ時刻より${h.mark}以上上がったら一日のうちに台風` : `気圧計が${h.mark}以上なら一日のうちに台風`, 当たり: h.hits, 外れ: h.falses, 見逃し: h.misses, 判断: { testing: '確かめ中', held: '確からしい', doubted: '怪しい' }[h.status] })) } : {}), battery: r.sp.living ? null : +r.battery.toFixed(2), ...(r.sp.living ? {} : { wear: +(r.wear ?? 0).toFixed(2), underRoof: roofCover(r).roof }), ...(r.id === 'dot' && r.stats.built >= HUT.length ? { house: houseNow() } : {}), holding: r.holding || '', night: dayK(hr) < 0.3, ...(r.sp.living ? { body: { おなか: full(r), ねむけ: awake100(r) } } : {}) },
       goal: a.goal, seeing: now, remembered: [...a.seen.values()].filter((o) => !ids.has(o.id)).sort((x, y) => y.at - x.at),
-      knowledge: a.knowledge, results: a.results, options: opts, hits: a.values.hits(6),
+      knowledge: a.knowledge, results: a.results, options: opts, hits: a.values.hits(6), metrics: metricsOf(r),
     };
   }
   // its own next step, as a task (undefined: it has nothing of its own in mind, the habits below decide)
@@ -2483,7 +2694,21 @@ export function makeResidents(loc: any, T: any, fishNames: string[], birdNames: 
   function flushMind(r: Resident, a: Agent) {
     for (const line of a.out.diary.splice(0)) { r.diary.push({ at: clockMs, text: line, key: 'mind' }); if (r.diary.length > 800) r.diary.shift(); tell('mind', `${r.v.name}：${line}`, r); }
     if (a.out.say) { r.today.push(a.out.say); if (r.today.length > 6) r.today.shift(); a.out.say = undefined; }
+    // its trials, for the screen and the log (PROGRAM.md §1): begun, and how each came out — a failure in the world's own
+    // words; a line that does not pass the words' rule (no option ids, no letters, no "22/24": PROGRAM.md §6) is not shown
+    for (const e of a.out.trials.splice(0)) {
+      // (a result in the words its own try was shown in, else its hypothesis's if they pass — never the words of another
+      // try, and with none, told with no text: viewer design on #181; the world's reason after the heading, ・, not for
+      // できなかった, which says no more than the heading)
+      const text = trialWords(e.text) ?? (e.also ? trialWords(e.also) : null), why = e.outcome && e.outcome !== 'unavailable' ? OUTCOME_JA[e.outcome] ?? undefined : undefined;
+      if (e.kind === 'start') r.trial = { text, at: clockMs, active: true };
+      else r.tried = { text, result: e.result!, at: clockMs, ...(why ? { outcome: why } : {}) };
+      res.onEvent('trial', `${r.v.name}：${e.kind === 'start' ? '試み' : TRIAL_JA[e.result!]}${why ? ` ・ ${why}` : ''}：${e.text}`, r, { trial: { kind: e.kind, result: e.result, text, outcome: why, metric: e.metric, now: e.now } });
+    }
+    if (r.trial && !a.trying) r.trial.active = false;
   }
+  const TRIAL_JA: Record<string, string> = { confirmed: '確かめた', refuted: '違っていた', done: 'やりとげた', 'not-yet': 'まだ届かない', 'steps-done': 'やってみた', failed: 'うまくいかなかった' };   // (PROGRAM.md §1-2)
+  const trialWords = (t: string) => { const s = t.trim(); return !s || s.length > 40 || /[A-Za-z_]+[:：_][A-Za-z]|[A-Za-z]{3,}|\d+\s*\/\s*\d+/.test(s) ? null : s; };
 
   /* ---------- finishing a task ---------- */
   function done(r: Resident, tk: Task, fast = false) {
@@ -2497,7 +2722,7 @@ export function makeResidents(loc: any, T: any, fishNames: string[], birdNames: 
         if (!fast) tell(tk.kind, `${r.v.name}：${result.text}`, r);
         if (tk.kind === 'study-share') {
           const c = heading('ランタンの星の手帖');
-          { const m = SAY.starsRecorded(); remark(r, m, c, fast); }
+          { const m = phrase({ act: 'stars-recorded' }); remark(r, m, c, fast); }
         }
       }
       r.task = null;
@@ -2559,9 +2784,11 @@ export function makeResidents(loc: any, T: any, fishNames: string[], birdNames: 
       case 'place': {
         const k = r.stats.built; if (k >= HUT.length) { r.holding = ''; break; }
         r.holding = ''; r.stats.built++;
+        if (r.stats.built >= HUT.length) markFirst('hut');   // (chapter 1's way: the hut, all its pieces — PROGRAM.md §2-1-1)
         launch(r, HUT[k], fast);
         { const g = (r as any).gotWood; if (g && clockMs - g.at < 86_400_000) { village.feedback.push({ from: r.id, to: g.from, f: { act: 'helped', what: 'wood', became: 'piece' }, at: clockMs }); if (village.feedback.length > 20) village.feedback.shift(); } (r as any).gotWood = undefined; }
-        note(r, r.stats.built === 18 ? 'done' : 'build', {}, r.stats.built === 18 ? '小屋を完成させた' : '小屋の部材をひとつ取りつけた');
+        // (the roof at the eighteenth piece; the hut done at its last — chapter 1's way counts the last: science on #187)
+        note(r, r.stats.built >= HUT.length ? 'done' : r.stats.built === 18 ? 'roof' : 'build', {}, r.stats.built >= HUT.length ? '小屋を完成させた' : r.stats.built === 18 ? '小屋の屋根ができた' : '小屋の部材をひとつ取りつけた');
         // now and then it stands back to look at what it has put up: from a couple of metres off, head on one
         // side and the other, a little lower once to see it level, a nod, and back to work. Only looking: it
         // changes nothing and writes nothing (not after every piece, not twice within three minutes)
@@ -2592,7 +2819,7 @@ export function makeResidents(loc: any, T: any, fishNames: string[], birdNames: 
       }
       case 'till': if (tk.data.s === 0) { tk.data.s = 1; drawField(); note(r, 'till', {}, '畑を耕した'); } break;
       case 'plant': if (tk.data.s === 1) { tk.data.s = 2; tk.data.at = clockMs; drawField(); note(r, 'plant', {}, '種をまいた'); } break;
-      case 'haul': if (village.raft.parts > 0 && !village.raft.hauled) { village.raft.hauled = true; drawRaft(); note(r, 'haul', {}, '台風に備えて、筏を浜の上へ引き上げた'); } break;
+      case 'haul': if (village.raft.parts > 0 && !village.raft.hauled) { const quick = !!tk.data?.quick; village.raft.hauled = true; village.raft.quick = quick; drawRaft(); note(r, 'haul', {}, quick ? '台風が来て、急いで筏を浜の上へ引き上げた' : '台風に備えて、筏を浜の上へ引き上げた'); } break;
       case 'harvest-early': if (tk.data.s === 2 && growth(tk.data) >= 0.6) { const ripe = growth(tk.data) >= 1; tk.data.s = 1; r.stats.food += ripe ? 4 : 2; drawField(); village.prepSaved.push('畑の実'); note(r, 'harvest', { food: r.stats.food }, `台風に備えて、畑の実を${ripe ? '' : '早めに'}収穫した`); } break;
       case 'harvest': if (tk.data.s === 2 && growth(tk.data) >= 1) { tk.data.s = 1; r.stats.food += 4; drawField(); note(r, 'harvest', { food: r.stats.food }, '畑で収穫した'); } break;
       case 'fire': return;   // (they stay round it until it is time to go)
@@ -2656,6 +2883,7 @@ export function makeResidents(loc: any, T: any, fishNames: string[], birdNames: 
           what = '浜に見慣れないものがあると知らせた';
         } else {
           utter(r, kind === 'warn' ? { act: 'warn', what: tk.data.what } : { act: 'plan', doing: tk.data.what }, 0, c); utter(o, { act: 'noted' }, 2200, c);
+          if (kind === 'warn' && tk.data.what === 'typhoon' && knowsPrep(r)) heardPrep(o.id);   // (passed on: now it knows too)
           what = kind === 'warn' ? `「${WARN_JA[tk.data.what]}」と知らせた` : `これから${PLAN_JA[tk.data.what]}と伝えた`;
         }
         r.diary.push({ at: clockMs, text: `${o.v.name}に${what}`, key: 'mind' });
@@ -2716,7 +2944,7 @@ export function makeResidents(loc: any, T: any, fishNames: string[], birdNames: 
         r.today.push(`浜で${DRIFT[drift.kind].ja}を見つけた`); note(r, 'find', { thing: DRIFT[drift.kind].ja }); tell('drift', `${r.v.name}が浜で${DRIFT[drift.kind].ja}を見つけた`, r); return;
       case 'shelve':
         if (r.holding !== 'drift') { tk.failed = 'unavailable'; break; }
-        r.holding = ''; village.treasures.push({ what: DRIFT[drift.kind].ja, who: r.v.name, at: clockMs }); drift.kind = -1; drift.t = 0; drawShelf(); break;
+        r.holding = ''; r.mo.shelveTries = 0; village.treasures.push({ what: DRIFT[drift.kind].ja, who: r.v.name, at: clockMs }); drift.kind = -1; drift.t = 0; drawShelf(); break;
       case 'fetch':
         if (!items.take(tk.data)) break;
         r.holding = tk.data.kind ?? 'stone'; r.task = null; return;   // (decide() takes it on: a stone to the cairn, a coconut to the shelf)
@@ -2777,10 +3005,12 @@ export function makeResidents(loc: any, T: any, fishNames: string[], birdNames: 
         if (!fast) fallFrom(t, dir);
         for (let k = 0; k < n; k++) items.addAt('wood', t.x + fx * (1.2 + k * 1.1), t.z + fz * (1.2 + k * 1.1));   // (the logs lie where it fell)
         { const mg = Math.round((6 + Math.random() * 6) * 1e6); addLot(lab, { materialId: 'firewood', amount: { value: mg, unit: 'mg' }, quality: { water_ppm: GREEN_WOOD_WATER }, location: 'shelf' }); drawStore(); }
-        village.felled.push({ x: t.x, z: t.z, h: +t.h.toFixed(1), kind: t.kind, at: clockMs }); drawStump(t.x, t.z); r.stats.felled++;
+        const fuel = !!tk.data.fuel;   // (felled to burn, its stump to be planted for: D-charcoal-pit §6.2; else, land opened)
+        village.felled.push({ x: t.x, z: t.z, h: +t.h.toFixed(1), kind: t.kind, at: clockMs, ...(fuel ? { fuel: 1 as const } : {}) }); drawStump(t.x, t.z); r.stats.felled++;
         const ww = windward(t.x, t.z);
-        note(r, 'chop', {}, `林の${KIND_JA[t.kind] ?? '木'}を切り倒した（高さ約${Math.round(t.h)}m。丸太${n}本、枝は薪にして棚の脇へ。まわりが開けた）${ww ? `。家の風上の木だった（風上で切った木 ${windbreakFelled()}本）` : ''}`);
-        tell('chop', `${r.v.name}が林の木を切り倒して、土地を開いた`, r);
+        if (fuel) note(r, 'chop', {}, `薪にするため、林の${KIND_JA[t.kind] ?? '木'}を切り倒した（高さ約${Math.round(t.h)}m。丸太${n}本、枝は薪にして棚の脇へ）`);
+        else note(r, 'chop', {}, `林の${KIND_JA[t.kind] ?? '木'}を切り倒した（高さ約${Math.round(t.h)}m。丸太${n}本、枝は薪にして棚の脇へ。まわりが開けた）${ww ? `。家の風上の木だった（風上で切った木 ${windbreakFelled()}本）` : ''}`);
+        tell('chop', fuel ? `${r.v.name}が薪にするため、林の木を切り倒した` : `${r.v.name}が林の木を切り倒して、土地を開いた`, r);
         break;
       }
       case 'seastone':
@@ -3150,10 +3380,32 @@ export function makeResidents(loc: any, T: any, fishNames: string[], birdNames: 
     const W = waterTop(r.pos.x, r.pos.z);   // (the still water's top here: the island's sea where the tide reaches it — ADR 0009)
     r.wet = h < W + 0.05;
     const top = W + (r.id === 'rakko' ? 0 : -0.2);   // floating at the surface (Rakko), or with its head out (Kamemaru)
+    if (r.id === 'kame') { placeKame(r, h, W, top); return; }
     if (!r.wet) r.pos.y = h;
-    else if (r.under > 0) r.pos.y = top + (h + (r.id === 'rakko' ? 0.18 : 0.075) - top) * r.under;   // (Kamemaru settled a little into the sand)   // (down on the bottom: diving, grazing, asleep)
-    else if (r.id === 'kame' && r.act === 'swim') r.pos.y = Math.max((T.top && h < W ? Math.max(h, T.top(r.pos.x, r.pos.z)) : h) + 0.3, W - 1.2 + Math.sin(performance.now() * 0.0003) * 0.2);   // (over the coral heads, not through them)
+    else if (r.under > 0) r.pos.y = top + (h + 0.18 - top) * r.under;   // (down on the bottom: diving, asleep)
     else r.pos.y = top;
+  }
+  // Kamemaru at the water's edge, in one piece (rehearsal finding R-020: its height jumped 25-55 cm in a frame where it
+  // went from dry to wet and from walking to swimming — on the ground, 0.2 m under the top, 0.3 m over the bottom did
+  // not meet; science team, 2026-10-26): in water shallower than it is tall it crawls along the bottom; as the water
+  // deepens it rises, over 0.3 m more of depth, to its height afloat — head out (W - 0.2), or swimming, the lower of
+  // over the bottom (and the coral) and that. While it rises or settles, its height changes by 0.5 m a second at most; a
+  // breath (under) is never slowed.
+  const KAME_RISE = 0.5;
+  function placeKame(r: Resident, h: number, W: number, top: number) {
+    const tall = BODY.kame?.y1 ?? 0.4, lift = r.wet ? smooth01(tall, tall + 0.3, W - h) : 0;
+    const swim = Math.min(Math.max((T.top && h < W ? Math.max(h, T.top(r.pos.x, r.pos.z)) : h) + 0.3, W - 1.2 + Math.sin(performance.now() * 0.0003) * 0.2), top);   // (over the coral heads, not through them; never out of the water)
+    let y = h + ((r.act === 'swim' ? swim : top) - h) * lift;
+    // (held back while it rises or settles, and after, until it has caught up; not across a jump in time — a save
+    // loaded, the hours caught up on)
+    const was = r.mo.lift, gap = was ? (clockMs - was.at) / 1000 : 0;
+    let held = false;
+    if (was && ((lift > 0 && lift < 1) || was.held) && gap > 0 && gap <= 1) {
+      const lo = was.y - KAME_RISE * gap, hi = was.y + KAME_RISE * gap;
+      if (y < lo || y > hi) { y = Math.max(h, Math.min(hi, Math.max(lo, y))); held = true; }   // (never into the ground)
+    }
+    r.mo.lift = { y, at: clockMs, held };
+    r.pos.y = r.under > 0 ? y + (h + 0.075 - y) * r.under : y;   // (down on the bottom: grazing, asleep — settled a little into the sand)
   }
 
   /* ---------- meeting and talking ---------- */
@@ -3186,8 +3438,9 @@ export function makeResidents(loc: any, T: any, fishNames: string[], birdNames: 
   function countsOf(r: Resident): Count[] {
     const s = r.stats;
     if (r.id === 'dot') return [{ what: 'hut', n: s.built, of: HUT.length }, { what: 'isle', n: Object.keys(village.map.seen).length }];
-    if (r.id === 'rakko') return [{ what: 'shell', n: s.shells }, { what: 'full', n: full(r) }];
-    if (r.id === 'kame') return [{ what: 'notes', n: s.notes }, { what: 'full', n: full(r) }];
+    const fed: Count = { what: 'full', n: full(r), hungry: r.hunger > (r.body?.learn.eatAt ?? 0.45) };   // (hungry or not by the world's mark, as tell-body)
+    if (r.id === 'rakko') return [{ what: 'shell', n: s.shells }, fed];
+    if (r.id === 'kame') return [{ what: 'notes', n: s.notes }, fed];
     return [{ what: 'map', n: statVars(r).map, pct: true }, { what: 'notes', n: s.notes }, { what: 'cairn', n: s.cairns }];
   }
 
@@ -3205,12 +3458,12 @@ export function makeResidents(loc: any, T: any, fishNames: string[], birdNames: 
     const lines: Line[] = [], shares: Talk['shares'] = [];
     const stage = bd.stage;
     const line = (r: Resident, m: Said) => lines.push({ who: r.id, text: m.ja, isl: m.isl, en: m.en });
-    if (stage === 0) for (const r of [a, b]) line(r, SAY.identify(r.id));
+    if (stage === 0) for (const r of [a, b]) line(r, phrase({ act: 'greet', who: r.id as Who }));
     else {
-      for (const r of [a, b]) line(r, SAY.report(countsOf(r)));
+      for (const r of [a, b]) line(r, phrase({ act: 'tell-progress', counts: countsOf(r) }));
       for (const [f, t] of [[a, b], [b, a]] as Resident[][]) {
         const ob = tip(f, t); if (!ob) continue;
-        line(f, SAY.share(ob.kind, ob.dist, t.id)); shares.push({ from: f, to: t, ob });
+        line(f, phrase({ act: 'tell-where', what: ob.kind as 'wood' | 'shell' | 'stone', metres: ob.dist, to: t.id as Who })); shares.push({ from: f, to: t, ob });
       }
     }
     keep(a); keep(b);
@@ -3357,13 +3610,14 @@ export function makeResidents(loc: any, T: any, fishNames: string[], birdNames: 
     // (a typhoon: nothing is done outdoors — the animals keep low in the water near home, the robots stay in by
     // the hut or their own place; hunger and sleepiness go on)
     const atSea = r.task?.kind === 'voyage' && !!r.task.data?.started;   // (out on the crossing: the voyage's own rules — below)
-    if (storm() && r.task?.kind !== 'shelter' && !r.talk && !atSea) {
+    if (storm() && r.task?.kind !== 'shelter' && !r.talk && !atSea && !(r.task?.kind === 'haul' && r.task.data?.quick)) {
       if (r.task) { report(r, r.task, 'interrupted', '台風'); items.release(r.id); }
       const home = r.sp.home, at = r.sp.living ? (spot(home, 60, water(1, 5)) ?? home) : houseRoofed() ? shelterAt(r) : (r.id === 'dot' ? [hut.position.x + 1.5, hut.position.z] as [number, number] : home);   // (a house with a roof: both robots in it)
       r.task = task('shelter', at, r.sp.living ? 'sleep' : 'idle', 1e9, r.sp.living ? { wet: true } : {}); r.blocked = 0;
     }
     if (r.task?.kind === 'shelter' && !storm() && !(r.task.data?.worn && r.stuck) && !(r.task.data?.rain && (wetNow() || ((r.wear ?? 0) > 0.3 && !meetHours(hr))))) r.task = null;   // (out of the rain: it stays to dry; worn, until it has)
-    if (!r.task || (sleepTime(r, hr) !== (r.task.kind === 'sleep') && r.task.kind !== 'approach' && r.task.kind !== 'shelter' && r.task.kind !== 'voyage' && !(r.sp.living && ['forage', 'eat', 'groom'].includes(r.task.kind)))) {
+    // (an animal's meal is not cut by its bedtime: Kamemaru grazing when the night comes eats, then sleeps — kame-fix.log)
+    if (!r.task || (sleepTime(r, hr) !== (r.task.kind === 'sleep') && r.task.kind !== 'approach' && r.task.kind !== 'shelter' && r.task.kind !== 'voyage' && !(r.sp.living && ['forage', 'eat', 'groom', 'graze'].includes(r.task.kind)))) {
       if (r.task) { report(r, r.task, 'interrupted', sleepTime(r, hr) ? '眠る時間になった' : '起きる時間になった'); items.release(r.id); }
       { const nt = (!sleepTime(r, hr) && maybeVisit(r, hr)) || decide(r, hr); r.task = nt && setAside(r, nt.x, nt.z) ? null : nt; }
       r.blocked = 0; r.mo.fails = 0;
@@ -3399,8 +3653,10 @@ export function makeResidents(loc: any, T: any, fishNames: string[], birdNames: 
     }
     if (tk.kind === 'voyage' && tk.arrived && !tk.data.started) {
       const j = voyageJudge(r, tk.data.isle), w = village.map.seen[tk.data.isle]?.word ?? '';
-      if (!j.go) { report(r, tk, 'blocked', j.why); r.task = null; return; }
+      if (!j.go) { r.voyageNoAt = clockMs; report(r, tk, 'blocked', j.why); r.task = null; return; }
       tk.data.started = true; tk.t = 0; tk.dur = voyageMs(j.km) / 1000;   // (on the island's clock: voyageJudge)
+      // (chapter 1: the crossings to the south island set out on until its load came — "the second crossing brought it")
+      if (tk.data.isle === 'south-near' && firstsOf()['south-load'] === undefined) village.southSetOut = (village.southSetOut ?? 0) + 1;
       // (rigged: under sail — the science side moves it, cell by cell, and it is home when it is home; the raft's lashing
       // takes no load of the cord's own on a sail crossing: the voyage counts the rig's cords. Not in the hours caught up
       // on by habit: the sail is a hand's work, and its cells are the world's clock as it passes)
@@ -3415,7 +3671,7 @@ export function makeResidents(loc: any, T: any, fishNames: string[], birdNames: 
       if (tk.data.sail) {   // (under sail: a storm brings the sail down and turns it for home — it comes back as the sea lets it)
         const h = sailSea.sail(clockMs, storm());
         if (h.home) { tk.data.why = h.turned ?? undefined; endVoyage(r, tk, h.turned ? 'turned' : 'reached', h.words); report(r, tk, h.turned ? 'blocked' : 'done', h.turned ? `${h.turned}ので引き返した` : undefined); r.task = null; placeY(r); return; }
-      } else if (storm()) { tk.data.why = '台風'; endVoyage(r, tk, 'turned'); report(r, tk, 'blocked', '台風で引き返した'); r.task = null; return; }
+      } else if (storm()) { tk.data.why = '台風'; r.voyageNoAt = clockMs; endVoyage(r, tk, 'turned'); report(r, tk, 'blocked', '台風で引き返した'); r.task = null; return; }
     }
     if (tk.kind === 'ask' || tk.kind === 'give' || tk.kind === 'tell') {
       // up to the one it means, close enough to speak or hand it over (they may be on the move); asleep, in the
@@ -3562,7 +3818,7 @@ export function makeResidents(loc: any, T: any, fishNames: string[], birdNames: 
     for (let i = 0; i < Math.min(byId.dot.stats.built, HUT.length); i++) HUT[i].visible = true;
     (s.trees || []).forEach((d: number, i: number) => { const t = TREES[i]; if (t && d && t.ok) { t.down = true; t.pivot.visible = false; t.stump.visible = true; } });
     (s.plots || []).forEach((d: number[], i: number) => { const pl = PLOTS[i]; if (pl) { pl.s = d[0]; pl.at = d[1]; } });
-    if (s.village) { Object.assign(village, s.village); village.labRuns ??= []; village.catcher ??= null; village.hypo ??= null; village.hypo2 ??= null; village.hypoHistory ??= []; village.mornings ??= 0; village.labDone ??= []; village.taught ??= {}; village.feedback ??= []; village.stormPrep ??= 0; village.heardOkAt ??= 0; village.swellGuess ??= { alarm: 0, hits: 0, falses: 0 }; village.prepBy ??= ''; village.prepSaved ??= []; village.heed ??= {}; village.onsetHunger ??= {}; village.stormLog ??= []; village.raft.hauled ??= false; village.house ??= { n: 0, rope: 0, bamboo: 0, clay: 0, lost: 0, weighed: false }; drawHouse(); village.felled ??= []; village.clayPit ??= null; drawPit(); village.wall ??= { n: 0, pile: 0 }; village.nest ??= { n: 0, at: null }; village.kameBed ??= null; village.ledge ??= { n: 0 }; village.spare ??= 0; village.lampLog ??= []; village.walks ??= {}; village.settle ??= null; for (const [id, h] of Object.entries(village.settle?.homes ?? {})) if (byId[id]) byId[id].sp.home = [h[0], h[1]]; drawWall(); drawNest(); drawLedge(); drawSpare(); drawLamp(); for (const f of village.felled) { T.forest?.fell(f.x, f.z); drawStump(f.x, f.z); } }
+    if (s.village) { Object.assign(village, s.village); village.labRuns ??= []; village.catcher ??= null; village.hypo ??= null; village.hypo2 ??= null; village.hypoHistory ??= []; village.mornings ??= 0; village.labDone ??= []; village.taught ??= {}; village.feedback ??= []; village.stormPrep ??= 0; village.heardOkAt ??= 0; village.swellGuess ??= { alarm: 0, hits: 0, falses: 0 }; village.prepBy ??= ''; village.prepSaved ??= []; village.heed ??= {}; village.onsetHunger ??= {}; village.stormLog ??= []; village.raft.hauled ??= false; village.raft.quick ??= false; village.prepTold ??= true; village.prepKnown ??= prepActive() ? list.map((r) => r.id) : []; village.swellSeen ??= null; village.house ??= { n: 0, rope: 0, bamboo: 0, clay: 0, lost: 0, weighed: false }; drawHouse(); village.felled ??= []; village.clayPit ??= null; drawPit(); village.wall ??= { n: 0, pile: 0 }; village.nest ??= { n: 0, at: null }; village.kameBed ??= null; village.ledge ??= { n: 0 }; village.spare ??= 0; village.lampLog ??= []; village.walks ??= {}; village.settle ??= null; for (const [id, h] of Object.entries(village.settle?.homes ?? {})) if (byId[id]) byId[id].sp.home = [h[0], h[1]]; drawWall(); drawNest(); drawLedge(); drawSpare(); drawLamp(); for (const f of village.felled) { T.forest?.fell(f.x, f.z); drawStump(f.x, f.z); } }
     showCatcher();
     if (s.lab) Object.assign(lab, s.lab);
     else for (const l of (s.village?.store ?? []) as LotView[]) lab.lots[l.lotId] = l;   // (saved before the ledger: the shelf as it was)
@@ -3585,13 +3841,16 @@ export function makeResidents(loc: any, T: any, fishNames: string[], birdNames: 
       if (who) who.diary.push({ at: clockMs, text: `帆の筏での渡航は途中で終わった${back.words.length ? `。${back.words.map((w) => w.replace(/。$/, '')).join('。')}` : ''}`, key: 'got' }); }
     // (the firsts the island had before it kept them: not told again as firsts — world/milestones.ts)
     { const f = ((village as any).firsts ??= {}) as Record<string, number>, had = (k: string, yes: unknown) => { if (yes && f[k] === undefined) f[k] = 0; };
-      had('light', village.lampLog.length); had('raft', village.raft.parts >= RAFT_N); had('pier', village.pier === 'done');
+      had('light', village.lampLog.some((l) => l.litS > 0)); had('raft', village.raft.parts >= RAFT_N || Object.keys(village.map.reached ?? {}).length > 0);   // (a raft halved by a storm had been whole: it crossed) had('hut', byId.dot.stats.built >= HUT.length);
+      had('fired-pot', Object.values(lab.lots).some((l) => l.materialId === 'fired_pot' && !l.quality?.crack) || !!lab.equipment[`eq:${COOK_POT_ASSEMBLY.kind}`] || !!lab.equipment[`eq:${LAMP_DISH_ASSEMBLY.kind}`] || !!lab.equipment[`eq:${POT_ASSEMBLY.kind}`] || !!lab.equipment[`eq:${RETORT_ASSEMBLY.kind}`]); had('pier', village.pier === 'done');
       had('weather-pot', lab.equipment[`eq:${POT_ASSEMBLY.kind}`]); had('retort', lab.equipment[`eq:${RETORT_ASSEMBLY.kind}`]); had('cook-pot', lab.equipment[`eq:${COOK_POT_ASSEMBLY.kind}`]);
       had('house-roof', village.house.n >= ROOF_N); had('house-walls', village.house.n >= WALLS_N); had('house', village.house.n >= HOUSE_N); had('wall', wallDone()); had('clay-pit', village.clayPit);
       had('sighting', Object.keys(village.map.seen).length);
       for (const id of Object.keys(village.map.reached ?? {})) had(`crossing:${village.map.seen[id]?.word ?? id}`, true);
       had('fibre', Object.values(lab.lots).some((l) => l.materialId === 'coir_fiber_bundle')); had('rope', Object.values(lab.lots).some((l) => l.materialId === 'coir_rope')); had('hang', village.cordHost.hang); had('lash', village.cordHost.raft);
-      had('sail', Object.values(lab.lots).some((l) => l.materialId === 'sail_mat')); had('mast', Object.values(lab.lots).some((l) => l.materialId === 'bamboo_mast')); }
+      had('sail', Object.values(lab.lots).some((l) => l.materialId === 'sail_mat')); had('mast', Object.values(lab.lots).some((l) => l.materialId === 'bamboo_mast'));
+      // (chapter 2's: as the lab has them now; and a pot fired had its seasoned wood, a lamp lit had its dish and its oil)
+      const c2 = chapter2Seen(); had('dry-wood', c2['dry-wood'] || f['fired-pot'] !== undefined); had('lamp-dish', c2['lamp-dish'] || f.light !== undefined); had('oil', c2.oil || f.light !== undefined); }
     for (const t of village.treasures) { const k = OLD_DRIFT.indexOf(t.what); if (k >= 0) t.what = DRIFT[k].ja; }   // (made things from an older island: what the sea brings now)
     lastFireAt = s.lastFireAt ?? 0;
     if (s.drift && s.drift.kind >= 0) { Object.assign(drift, s.drift); driftMesh.geometry = DRIFT[drift.kind].geo; driftMesh.material = DRIFT[drift.kind].mat; driftMesh.position.set(drift.x, L.h(drift.x, drift.z) + 0.06, drift.z); driftMesh.visible = !drift.by || !list.some((r) => r.holding === 'drift'); }
@@ -3601,64 +3860,127 @@ export function makeResidents(loc: any, T: any, fishNames: string[], birdNames: 
   }
 
   // what it is doing, in words
+  // The status line (live screen, watch mode): what it is doing now, in the world's own words — VOICE.md §2 and §9
+  // (rehearsal finding R-017): no subject, 「〜ている」, a concrete thing and place, never 散歩・ひと休み・休憩・作業 or a
+  // feeling; a reason is put in only where the world has it (a body's word only while the body is so; Lantern, with no
+  // mind of its own yet, never 「考えている」); with nothing to do, no line at all (the band shows the name alone).
+  const lastLine: Record<string, string> = {};
+  const VESSEL_JA: Record<string, string> = { pot: '鍋', dish: '灯皿', retort: '蒸留の壺', gauge: '天気の壺' };   // (what a fired vessel is made into: assemble's as)
   function statusOf(r: Resident): string {
+    const s = statusLine(r);
+    if (s === KEEP) return lastLine[r.id] ?? '';   // (a pause between its notebook's steps: the line it had, not a new one for 20 s)
+    lastLine[r.id] = s; return s;
+  }
+  const KEEP = '\u0000';
+  function statusLine(r: Resident): string {
     if (r.talk) { const o = r.talk.a === r ? r.talk.b : r.talk.a; return `${o.v.name}と話している`; }
     if (r.seen) return `通りかかった${r.seen.name}を、目で追っている`;
     const tk = r.task, k = tk?.kind ?? 'idle';
     if (r.id === 'lantern' && k.startsWith('study-')) {
-      const labels: Record<string, string> = { 'study-observe': '星の位置を確かめている', 'study-draw': '観察した空を手帖に描いている', 'study-explore': '次に空を眺める場所を確かめている', 'study-rest': '手帖を閉じて、ひと休みしている', 'study-share': '近くの友だちに星の手帖を見せている', 'study-pause': '丘で次に気になることを考えている' };
-      return tk?.arrived ? labels[k] ?? '手帖を見返している' : '気になる場所へ歩いている';
+      if (k === 'study-pause') return KEEP;
+      const place = tk ? studyPlaces.find((p) => Math.hypot(p.x - tk.x, p.z - tk.z) < 3)?.name : undefined;
+      const labels: Record<string, string> = { 'study-observe': '星の並びを、手帖に記している', 'study-draw': '見た星の並びを、図に描き直している', 'study-explore': '次に空を眺める場所を確かめている', 'study-rest': r.battery < 0.25 ? '電池を休ませている' : '手帖を閉じて、じっとしている', 'study-share': '仕上げた星の図を、仲間に見せている' };
+      if (tk?.arrived) return labels[k] ?? '手帖を見返している';
+      const toSee = place ? `星を見に、${place}へ歩いている` : '星を見る場所へ歩いている';
+      return k === 'study-observe' ? toSee : k === 'study-explore' ? '次に空を眺める場所へ歩いている' : '気になる場所へ歩いている';
     }
     const far = tk && !tk.arrived ? Math.round(Math.hypot(tk.x - r.pos.x, tk.z - r.pos.z)) : 0, left = far > 3 ? `（あと${far}m）` : '';
-    const going: Record<string, string> = { ask: `${byId[tk?.data?.to]?.v.name ?? '仲間'}のところへ頼みに行く`, give: `${byId[tk?.data?.to]?.v.name ?? '仲間'}に流木を届けに行く`, tell: `${byId[tk?.data?.to]?.v.name ?? '仲間'}に知らせに行く`, eat: '獲物をかかえて浮かんでいる', forage: '餌場へ泳いでいく', graze: '海草の原へ泳いでいく', bask: '甲羅干しの浜へ向かう', groom: '静かな水面へ', survey: '桟橋の場所へ向かう', inspect: '桟橋の工事を見に行く', base: '土台の石を桟橋へ運んでいる', post: '柱にする木を桟橋へ運んでいる', deck: '桟橋の板を運んでいる', find: '浜で見慣れないものを見つけて近づいていく', shelve: '見つけたものを小屋の棚へ運んでいる', chop: '若木のところへ向かう', till: '畑へ向かう', plant: '畑へ種をまきに行く', harvest: '畑へ収穫に行く', fire: circleMorning ? '朝の集まりへ向かっている' : '焚き火へ向かっている', gather: '流木を拾いに行く', collect: '貝殻を拾いに行く', fetch: '石積みの石を拾いに行く', craft: '流木を作業台へ運んでいる', place: `削った部材を小屋へ運んでいる`, review: '取りつけたところを見に、少し離れる', pile: '貝殻を運んでいる', stack: '石を石積みへ運んでいる', show: '見つけた貝殻を見せにいく' };
+    const who = byId[tk?.data?.to]?.v.name ?? '仲間';
+    const hutDone = r.stats.built >= HUT.length, forDot = requests.some((q) => q.to === r.id && q.status === 'accepted');
+    const hungry = !!r.body && r.hunger > r.body.learn.eatAt, sleepy = !!r.body && r.sleepy > r.body.learn.sleepAt;
+    const coconut = tk?.data?.kind === 'coconut';
+    // (a coconut "for oil" only when the coconut work can begin — its step ready and its tools standing; else one to
+    // keep on the shelf — and the look along the shore "watching for driftwood" only while Dot wants wood, the beach
+    // has room for more (eight at most, every 1200 s, within 160 m of Dot's home) and it is looking there: science,
+    // 2026-10-27, ad5c9a3)
+    const forOil = coconut && catalog.some((e) => e.processId === 'p30x_coconut_milk' && e.ready && (!e.built || !!lab.equipment[`eq:${e.built}`]));
+    const forWood = r.id === 'dot' && !r.holding && !hutDone && items.list.filter((it: any) => it.kind === 'wood').length < 8 && !!tk && Math.hypot(tk.x - r.sp.home[0], tk.z - r.sp.home[1]) <= 160;
+    const going: Record<string, string> = {
+      ask: `${who}に、流木を頼みに行っている`, give: `${who}に流木を届けに行っている`, tell: `${who}に知らせに行っている`, eat: '獲物をかかえて浮かんでいる',
+      forage: '餌場へ泳いでいる', graze: '海草を食べに、藻場へ泳いでいる', bask: '甲羅干しの浜へ向かっている', groom: '静かな水面へ向かっている',
+      survey: '桟橋の場所へ向かっている', inspect: '桟橋の工事を見に行っている', base: '土台の石を桟橋へ運んでいる', post: '柱にする木を桟橋へ運んでいる',
+      deck: '桟橋の板を運んでいる', find: '浜の見慣れないものを、調べに行っている', shelve: '見つけたものを小屋の棚へ運んでいる', chop: '若木のところへ向かっている',
+      till: '畑へ向かっている', plant: '畑へ種をまきに行っている', harvest: '畑へ収穫に行っている', fire: circleMorning ? '朝の集まりへ向かっている' : '焚き火へ向かっている',
+      gather: r.id === 'dot' && !hutDone ? '小屋の部材にする流木を拾いに行っている' : r.id === 'rakko' && forDot ? 'ドットに渡す流木を、拾いに行っている' : '流木を拾いに行っている',
+      collect: '貝殻を拾いに行っている', fetch: forOil ? '油をとるヤシの実を、拾いに行っている' : coconut ? 'たくわえるヤシの実を、拾いに行っている' : '石を拾いに行っている', craft: '流木を作業台へ運んでいる',
+      place: '削った部材を小屋へ運んでいる', review: '削った部材を小屋へ運んでいる', pile: '貝殻を運んでいる', stack: '石を石積みへ運んでいる', show: '見つけた貝殻を見せに行っている',
+      chart: '水平線の見える浜へ向かっている', lash: '部材を筏へ運んでいる', voyage: '筏へ向かっている', lab: '棚へ向かっている',
+      shelter: '雨風をよけに、屋根の下へ向かっている',
+    };
     const prey = ({ urchin: 'ウニ', crab: 'カニ', clam: '貝' } as Record<string, string>)[tk?.data] ?? '';
     const k01 = tk ? tk.t / tk.dur : 0;
+    const placeLine = hutDone ? '小屋に部材を取りつけている' : `小屋に部材を取りつけている（${r.stats.built + 1}本目）`;
     const at: Record<string, string> = {
-      ask: `${byId[tk?.data?.to]?.v.name ?? '仲間'}に頼みごとをしている`, give: `${byId[tk?.data?.to]?.v.name ?? '仲間'}に流木を手渡している`, tell: `${byId[tk?.data?.to]?.v.name ?? '仲間'}に流木の場所を教えている`,
-      forage: k01 < 0.12 ? '頭から潜っていく' : k01 > 0.86 ? (prey ? `${prey}をかかえて浮かんでくる` : '手ぶらで浮かんでくる') : '海の底で、前足で岩の下を探っている',
+      ask: `${who}に、流木を頼んでいる`, give: `頼まれた流木を、${who}に届けている`, tell: `${who}に、流木のある場所を教えている`,
+      forage: k01 < 0.12 ? '頭から潜っていく' : k01 > 0.86 ? (prey ? `${prey}をかかえて浮かんでくる` : '手ぶらで浮かんでくる') : hungry ? 'おなかがすいて、岩場に潜っている' : '海の底で、前足で岩の下を探っている',
       eat: tk?.data === 'clam' ? 'お腹の上の石で貝を割って食べている' : `仰向けに浮かんで、${prey}を食べている`,
       groom: '水面で転がりながら毛づくろいしている',
-      review: '取りつけた部材を、少し離れて眺めている',
-      admire: '拾った貝殻を、前足で回して眺めている',
+      review: placeLine,
       show: `拾った貝殻を${byId[tk?.data]?.v.name ?? '仲間'}に見せている`,
-      graze: r.act === 'breathe' ? '息つぎに浮かんできた' : '海の底で海草を食べている',
-      bask: '浜で甲羅干しをしている',
-      shelter: '台風のあいだ、身を低くしてやりすごしている',
-      chart: '浜から水平線を見渡し、見える島を地図に記している', lab: `${catalog.find((e) => e.processId === tk?.data?.processId)?.ja ?? '工程'}`, lash: '部材を筏に組んでいる',
+      graze: r.act === 'breathe' ? '息つぎに浮かんできた' : hungry ? 'おなかがすいて、藻場で海草を食べている' : '海の底で海草を食べている',
+      bask: tk?.data?.why === 'sleepy' ? '眠気がさして、浜で体を休めている' : '浜で甲羅干しをしている',
+      shelter: tk?.data?.worn ? '傷みがひどく、屋根の下で乾かしている' : tk?.data?.rain ? '濡れた体を、屋根の下で乾かしている' : r.sp.living ? '台風のあいだ、身を低くしている' : '台風がすぎるまで、屋根の下で待っている',
+      chart: '水平線の島を、地図に記している', lash: '海を渡る筏に、部材を組んでいる',
+      lab: tk && tk.dur > 60 ? `${catalog.find((e) => e.processId === tk?.data?.processId)?.inputJa || '棚の材料'}を、そばで見守っている` : `${catalog.find((e) => e.processId === tk?.data?.processId)?.ja ?? '工程'}`,   // (a step that waits: kept watch over; else the step's own name)
       voyage: tk?.data?.started ? `筏で${village.map.seen[tk.data.isle]?.word ?? ''}へ渡っている（島にはいない）` : '筏で出る支度をしている',
-      survey: '桟橋の場所を測っている', inspect: '桟橋の工事と潮を見守っている', base: '土台の石を据えている', post: '泳ぎながら柱を立てている', deck: `桟橋に板を張っている（${village.deck + 1}/8）`, find: '見つけたものを拾い上げて調べている', shelve: '見つけたものを棚に飾っている', chop: '斧で若木を切っている', till: '鍬で畑を耕している', plant: '種をまいている', harvest: '実を収穫している', fire: circleMorning ? '朝の集まりで話している' : '焚き火を囲んで話している', gather: '流木を拾い上げている', collect: '貝殻を拾い上げている', fetch: '石を拾い上げている', craft: `作業台で流木を部材に削っている（${r.stats.built + 1}本目）`, place: `部材を小屋に取りつけている（${r.stats.built + 1}/${HUT.length}）`, pile: '貝殻を浜に並べている', stack: '石を積み上げている' };
+      survey: '桟橋を建てる場所を、測っている', inspect: '桟橋の工事と潮を見守っている', base: '桟橋の土台石を、据えている', post: '泳ぎながら、桟橋の柱を立てている', deck: `桟橋に板を張っている（${village.deck + 1}枚目）`,
+      find: '見慣れないものを、拾って調べている', shelve: '浜で見つけたものを、棚に飾っている', chop: '斧で若木を切っている', till: '鍬で畑を耕している', plant: '種をまいている', harvest: '実を収穫している',
+      fire: circleMorning ? '朝の集まりで、今日の仕事を話している' : '焚き火を囲んで話している', gather: '流木を拾い上げている', collect: '並べる貝殻を、浜で拾っている',
+      fetch: coconut ? 'ヤシの実を拾い上げている' : '石を拾い上げている',
+      craft: hutDone ? '桟橋の板に、流木を削っている' : `小屋の部材に、流木を削っている（${r.stats.built + 1}本目）`, place: placeLine,
+      pile: '拾った貝殻を、浜の山に並べている', stack: '石を積み上げている' };
     // (what it is doing now, from how its walk is going, not from what it means to do once there: held up on the
     // way, or still on its way, says so; only once there does it say it is doing it)
-    if (tk && !tk.arrived && r.went === 'blocked' && r.blocked > 1.5) return '行く手がふさがっていて、回り道を探している';
-    if (!r.talk && tk && going[k]) return tk.arrived ? at[k] : going[k] + left;
+    if (tk && !tk.arrived && r.went === 'blocked' && r.blocked > 1.5) return '行く手がふさがり、回り道を探している';
+    if (tk && tk.arrived && at[k]) return at[k];
+    if (tk && !tk.arrived && going[k]) return going[k] + left;
     const toward: Record<string, string> = {
       store: 'ヤシの実を棚へ運んでいる', catcher: '雨受けを作りに棚へ向かっている', haul: '筏を引き上げに浜へ向かっている', reef: '流木を沈める場所へ運んでいる',
-      replant: '荒れた藻場を植え直しに向かっている', say: `${byId[tk?.data?.to]?.v.name ?? '仲間'}に伝えに行く`, shiver: '体を温められる水面へ向かっている',
-      'harvest-early': '畑へ早めの収穫に行く', 'husk-beat': 'ヤシの殻を叩きに作業場へ向かっている', 'husk-clear': 'やりかけの殻の仕事を片付けに行く',
-      'cord-work': '縄仕事の場所へ向かっている', 'cord-clear': 'やりかけの縄仕事を片付けに行く', 'cord-lash': '筏を縄で縛りに浜へ向かっている',
-      'sail-work': tk?.data?.op === 'harvest' ? 'タコノキの葉を採りに向かっている' : '帆の仕事の場所へ向かっている', 'sail-rig': '帆を張りに筏へ向かっている', 'sail-clear': 'やりかけの帆の仕事を片付けに行く',
-      sleep: r.sp.swims && tk?.wet ? '眠る場所へ泳いでいく' : '寝床へ向かっている', charge: '日なたへ向かっている', look: '海の見える場所へ向かっている', watch: '海を観察する浜へ向かっている',
-      rest: '丘のふもとへ向かっている', think: '丘の上へ歩いている', float: '静かな水面へ向かっている', nap: '昼寝のできる静かな水面へ向かっている', crack: '貝を割る場所へ向かっている',
-      carry: '流木を運んでいる', build: '小屋へ向かっている', idle: 'ひと休みできる場所へ向かっている', house: '家の作業に向かっている', cut: '草を刈りに向かっている', tool: '棚へ道具を作りに向かっている', stackwood: '薪をまとめに向かっている', assemble: '焼いた器を取りに向かっている', wick: '棚で芯をよりに行く', stow: '作業台へ部材を置きに行く', take: '作業台へ部材を取りに行く', seastone: '石を拾いに潜りに行く', nest: '休み場に石を運んでいる', ledge: 'カメマルの岩棚へ石を運んでいる', stonedrop: '石を浜の石置き場へ運んでいる', wallfetch: '石置き場へ石を取りに行く', wall: '石を石垣へ運んでいる', shelter: '雨風をよけに屋根の下へ',
+      replant: '荒れた藻場を植え直しに向かっている', say: `${who}に伝えに行っている`, shiver: '体を温められる水面へ向かっている',
+      'harvest-early': '畑へ早めの収穫に行っている', 'husk-beat': 'ヤシの殻を叩きに作業場へ向かっている', 'husk-clear': 'やりかけの殻の仕事を片付けに行っている',
+      'husk-soak': 'ヤシの殻を、潮だまりへ運んでいる', 'husk-takeout': '殻を引き上げに、潮だまりへ向かっている',
+      'cord-work': '縄をなう場所へ向かっている', 'cord-clear': 'やりかけの縄仕事を片付けに行っている', 'cord-lash': '筏を縄で縛りに浜へ向かっている',
+      'cord-dry': '繊維を干しに、軒下へ向かっている', 'cord-takein': '繊維を取り込みに、軒下へ向かっている',
+      'cord-hang': '鍋を吊るしに、軒下へ向かっている', 'cord-unhang': '吊るした鍋を下ろしに向かっている',
+      'sail-work': tk?.data?.op === 'harvest' ? 'アダンの葉を採りに向かっている' : '帆を作る場所へ向かっている', 'sail-rig': '帆を張りに筏へ向かっている', 'sail-clear': 'やりかけの帆の仕事を片付けに行っている',
+      'sail-dry': '葉を干しに、軒下へ向かっている', 'sail-takein': '葉を取り込みに、軒下へ向かっている',
+      sleep: r.sp.swims && tk?.wet ? '眠る場所へ泳いでいる' : '寝床へ向かっている', charge: '日なたへ向かっている', look: '海の見える場所へ向かっている', watch: '海を観察する浜へ向かっている',
+      rest: r.id === 'kame' ? '浜へ向かっている' : '丘のふもとへ向かっている', think: '丘の上へ歩いている', float: '静かな水面へ向かっている', nap: '昼寝のできる静かな水面へ向かっている',
+      house: '家を建てに向かっている', cut: '草を刈りに向かっている', tool: '棚へ道具を作りに向かっている', stackwood: '薪をまとめに向かっている', assemble: '焼いた器を取りに向かっている', wick: '棚で芯をよりに行っている', stow: '作業台へ部材を置きに行っている', take: '作業台へ部材を取りに行っている', seastone: '石を拾いに潜りに行っている', nest: '休み場に石を運んでいる', ledge: 'カメマルの岩棚へ石を運んでいる', stonedrop: '石を浜の石置き場へ運んでいる', wallfetch: '石置き場へ石を取りに行っている', wall: '石を石垣へ運んでいる',
+      weigh: '屋根に重しをかけに向かっている', visit: '仲間のいるほうへ歩いている', wander: r.id === 'rakko' ? '浜のほうへ歩いている' : '近くを歩いている', approach: '仲間に気づいて、近づいている',
     };
     if (tk && !tk.arrived && toward[k]) return toward[k] + left;
+    const night = !dayK(localHour(clockMs)), vessel = VESSEL_JA[tk?.data?.as ?? 'pot'] ?? VESSEL_JA.pot;
     const base: Record<string, string> = {
-      store: 'ヤシの実を棚に置いている', catcher: '竹と葉で雨受けを作っている', haul: '台風に備えて、筏を浜の上へ引き上げている', reef: '流木を海に沈めて、漁礁をつくっている',
-      replant: '荒れた藻場を植え直している', say: `${byId[tk?.data?.to]?.v.name ?? '仲間'}に伝えている`, shiver: r.wet ? '冷えた体を、水面で毛づくろいして温めている' : '冷えて、体を震わせている',
-      doze: r.wet ? '波に揺られて、うとうとしている' : 'うとうとしている',
-      'harvest-early': '台風の前に、畑の実を早めに収穫している', 'husk-beat': 'ヤシの殻を叩いて、繊維をほぐしている', 'husk-clear': 'やりかけの殻の仕事を片付けている',
-      'cord-work': ({ sieve: 'ヤシの繊維を振るって髄を落としている', twist: 'ヤシの繊維を撚って糸にしている', ply: '撚り糸を三本合わせて縄にしている' } as Record<string, string>)[tk?.data?.op] ?? 'ヤシの繊維で縄仕事をしている',
-      'cord-clear': 'やりかけの縄仕事を片付けている', 'cord-lash': '筏を縄で縛っている',
-      'sail-work': ({ harvest: 'タコノキの葉を採っている', split: 'タコノキの葉を裂いている', weave: 'タコノキの葉で帆を編んでいる', mast: '竹で帆柱を作っている' } as Record<string, string>)[tk?.data?.op] ?? '帆の仕事をしている',
-      'sail-rig': '筏に帆柱と帆を取りつけている', 'sail-clear': 'やりかけの帆の仕事を片付けている',
-      sleep: r.id === 'kame' && r.wet ? (r.act === 'breathe' ? '眠りの合間に息つぎに浮かんできた' : '海の底の岩かげで眠っている') : r.wet ? '仰向けで波に揺られて眠っている' : '眠っている', charge: '日なたで充電している', gather: tk?.arrived ? '流木を拾っている' : '流木を探しに浜へ', carry: '流木を運んでいる', build: '小屋を建てている', house: '家を建てている', fell: '林の木を切り倒している', tool: '道具を作っている', stackwood: '薪を1つの山にまとめている', assemble: '焼いた器を鍋にしている', wick: '灯皿の芯をよっている', stow: '部材を作業台の脇に置いている', take: '部材を手に取っている', seastone: '海の底で石を拾っている', nest: '休み場の囲いに石を積んでいる', ledge: 'カメマルの岩棚のまわりに石を置いている', stonedrop: '浜に石を置いている', wallfetch: '石置き場で石を取っている', wall: '石垣を積んでいる', pit: '粘土の池を掘っている', twist: '縄をなっている', cut: '茅にする草を刈っている', weigh: '屋根に重しをかけている',
-      look: '海を眺めている', wander: '散歩している', watch: '浜で海を観察している', swim: 'ラグーンを泳いで記録している', rest: '丘のふもとで夜を待っている', think: '丘の上で星を見て考えごとをしている',
-      explore: '夜の島を歩いて地図を作っている', float: '沖で仰向けに浮かんでいる', crack: 'お腹の上で貝を割っている', collect: '浜で貝殻を拾っている', pile: '貝殻を浜に並べている', nap: '仰向けに浮いたまま昼寝している',
-      visit: 'となりの浜のほうへ散歩している', approach: '誰かに気づいて近づいていく', idle: 'ひと休みしている', ponder: 'どうするか考えている', photo: `${tk?.data?.ob?.label?.replace(/（.*?）$/, '') ?? '景色'}を写真に撮っている`, answer: tk?.data?.yes ? '頼みを引き受けている' : '頼みを断っている',
+      store: '油をとるヤシの実を、棚に置いている', catcher: '雨水をためる雨受けを、作っている', haul: '台風にそなえて、筏を引き上げている', reef: 'ラッコの漁礁に、流木を沈めている',
+      replant: 'カメマルの藻場を、植え直している', say: `${who}に伝えている`, shiver: r.wet ? '冷えた体を、毛づくろいで温めている' : '冷えて、体を震わせている',
+      doze: r.wet ? '眠気に負けて、波の上でうとうとしている' : '眠気に負けて、うとうとしている',
+      'harvest-early': '台風の前に、畑の実を早めに収穫している', 'husk-beat': '縄にする繊維を、殻を叩いてとっている', 'husk-clear': '打ちかけのヤシの殻を、片付けている',
+      'husk-soak': 'ほぐすヤシの殻を、潮だまりに浸けている', 'husk-takeout': '浸けたヤシの殻を、引き上げている',
+      'cord-work': ({ sieve: 'ヤシの繊維を振るって髄を落としている', twist: 'ヤシの繊維を撚って糸にしている', ply: '撚り糸を三本合わせて縄にしている' } as Record<string, string>)[tk?.data?.op] ?? 'ヤシの繊維で縄をなっている',
+      'cord-clear': 'やりかけの縄仕事を片付けている', 'cord-lash': '海を渡る筏を、縄で縛っている',
+      'cord-dry': '縄にする繊維を、軒下に干している', 'cord-takein': '乾いた繊維を、軒下から取り込んでいる', 'cord-hang': '縄で、鍋を軒下に吊るしている', 'cord-unhang': '吊るした鍋を、下ろしている',
+      'sail-work': ({ harvest: '帆にするアダンの葉を、刈っている', split: 'アダンの葉を裂いている', weave: 'アダンの葉で帆を編んでいる', mast: '竹で帆柱を作っている' } as Record<string, string>)[tk?.data?.op] ?? '帆を作っている',
+      'sail-rig': '海を渡る筏に、帆を張っている', 'sail-clear': 'やりかけの帆の仕事を片付けている', 'sail-dry': '帆にする葉を、軒下に干している', 'sail-takein': '乾いた葉を、取り込んでいる',
+      sleep: r.id === 'kame' && r.wet ? (r.act === 'breathe' ? '眠りの合間に息つぎに浮かんできた' : '海の底の岩かげで眠っている') : r.wet ? '仰向けで波に揺られて眠っている' : r.id === 'lantern' ? '夜にそなえて、昼のあいだ眠っている' : '眠っている',
+      charge: night ? 'じっとして、電池を保っている' : r.battery < 0.6 ? '電池が減って、日なたで充電している' : '日なたで充電している',
+      gather: tk?.arrived ? '流木を拾っている' : '流木を探しに浜へ向かっている',
+      house: village.house.lost > 0 && village.house.n >= ROOF_N ? '台風で飛んだ茅を、葺き直している' : '家を建てている', fell: tk?.data?.fuel ? '薪にするため、林の木を切り倒している' : '丸太をとりに、林の木を切り倒している', tool: '道具を作っている',
+      stackwood: '野焼きの薪を、ひと山にまとめている', assemble: `焼いた器を、${vessel}にしている`, wick: '明かりを灯す芯を、よっている',
+      stow: 'あとで使う部材を、作業台に置いている', take: '家に使う部材を、作業台から取っている', seastone: '海の底で石を拾っている', nest: '荒れた日にそなえて、囲いに石を積んでいる', ledge: '岩棚に、うねりよけの石を置いている',
+      stonedrop: 'ドットの石垣の石を、浜に運んでいる', wallfetch: '石垣にする石を、石置き場で取っている', wall: '茅を守る石垣を、積んでいる', pit: '粘土を浸す池を、掘っている', twist: '家に使う縄を、なっている',
+      cut: '屋根の茅にする草を、刈っている', weigh: '台風にそなえて、屋根に重しをかけている',
+      look: forWood ? '浜で、流木が上がるのを見張っている' : '海を眺めている', wander: r.id === 'rakko' ? '浜で、あたりを見ている' : r.id === 'kame' ? '浜の近くで、あたりを見ている' : '家の近くで、あたりを見ている',
+      watch: '浜から、泳ぐ魚を見分けている', swim: 'ラグーンを泳いで、魚を見分けている',
+      rest: r.id === 'kame' ? 'おなかがすきすぎて、浜で動けずにいる' : '星が出るまで、丘のふもとで待っている', think: '丘の上で、星を見ている',
+      explore: 'まだ歩いていない所を、地図にしている', float: '沖で仰向けに浮かんでいる', pile: '拾った貝殻を、浜の山に並べている',
+      nap: sleepy ? '眠くなって、波の上で眠っている' : '波の上で、昼寝している',
+      visit: '仲間の近くで、立ち止まっている', approach: '仲間に気づいて、近づいている', idle: '', ponder: 'どうするか考えている', photo: `${tk?.data?.ob?.label?.replace(/（.*?）$/, '') ?? '景色'}を、写真に残している`,
+      answer: tk?.data?.yes ? `${byId[tk?.data?.q?.from]?.v.name ?? '仲間'}の頼みを、引き受けている` : '頼みを断っている',
     };
-    // (nothing said for what it does: on its way somewhere, it says only that it is walking — not that it is resting —
-    // rehearsal finding R-002)
-    return base[k] ?? (tk && !tk.arrived ? (r.wet ? '泳いでいる' : '歩いている') + left : 'ひと休みしている');
+    // (nothing said for what it does: on its way somewhere, it says only that it is walking — never that it is resting,
+    // rehearsal finding R-002 —; there, nothing at all rather than words that are not so)
+    return base[k] ?? (tk && !tk.arrived ? (r.wet ? '泳いでいる' : '歩いている') + left : '');
   }
   const res: Residents = {
     list, bonds, talks, group,
@@ -3688,6 +4010,13 @@ export function makeResidents(loc: any, T: any, fishNames: string[], birdNames: 
       if (!was && storm()) {   // a typhoon comes in: everyone records it; those with a mind have something to think about
         stormSince = clockMs; hypoStorm(clockMs);
         for (const r of list) if (r.sp.living) village.onsetHunger[r.id] = r.hunger;
+        // (Dot, up and within 60 m of a raft left on the beach, hauls it up before it shelters — in a hurry, as one would;
+        // it saves half of what getting ready would have: owner's decision 2026-10-28, science's specs/storm-prep-habit.md)
+        { const d = byId.dot, rf = village.raft;
+          if (d && rf.parts > 0 && !rf.hauled && Number.isFinite(rf.x) && !sleepTime(d, localHour(clockMs)) && Math.hypot(d.pos.x - rf.x, d.pos.z - rf.z) <= 60 && !(d.task?.kind === 'voyage' && d.task.data?.started)) {
+            if (d.task) { report(d, d.task, 'interrupted', '台風'); items.release(d.id); }
+            d.task = task('haul', [rf.x, rf.z], 'work', rr(40, 70), { data: { quick: true } });
+          } }
         // (one who is up tells those near it, plainly: to shelter)
         { const awake = (x: Resident) => !sleepTime(x, localHour(clockMs)) && !x.talk, caller = [byId.lantern, byId.dot].find((x) => x && awake(x));
           if (caller) for (const o of list.filter((x) => x !== caller && awake(x) && Math.hypot(x.pos.x - caller.pos.x, x.pos.z - caller.pos.z) < 60).slice(0, 3)) {
@@ -3754,7 +4083,7 @@ export function makeResidents(loc: any, T: any, fishNames: string[], birdNames: 
           const b = hut.localToWorld(benchL.clone()); marks.push({ x: b.x, y: b.y + 0.7, z: b.z, kind: 'place', label: '作業台', hot: tk?.kind === 'craft' });
           if (byId.dot.stats.built < HUT.length) { const w = slotWorld(byId.dot.stats.built); marks.push({ x: w.x, y: w.y, z: w.z, kind: 'slot', label: `次の部材 #${byId.dot.stats.built + 1}`, hot: tk?.kind === 'place' }); }
           for (const pl of PLOTS) if (pl.ok) marks.push({ x: pl.x, y: L.h(pl.x, pl.z) + 0.3, z: pl.z, kind: 'plot', label: '畑', sub: pl.s === 0 ? '未開墾' : pl.s === 1 ? '耕した' : growth(pl) >= 1 ? '収穫どき' : `生育 ${Math.round(growth(pl) * 100)}%`, hot: tgt === pl });
-          for (const t of TREES) if (t.ok && !t.down) marks.push({ x: t.x, y: L.h(t.x, t.z) + 2.2, z: t.z, kind: 'tree', label: '若木', sub: 'モクマオウ', hot: tgt === t });
+          for (const t of TREES) if (t.ok && !t.down) marks.push({ x: t.x, y: L.h(t.x, t.z) + 2.2, z: t.z, kind: 'tree', label: '若木', sub: 'オオハマボウ', hot: tgt === t });   // (the island's trees are its own native ones: owner 2026-10-31; their look is the nature team's to redraw
         }
       }
       for (const c of cairnSpots) if (near(c[0], c[1], 60)) marks.push({ x: c[0], y: L.h(c[0], c[1]) + 0.2 + 0.22 * c[2], z: c[1], kind: 'place', label: '石積み', sub: `${c[2]}/4 段`, hot: tgt === c });
@@ -3773,7 +4102,7 @@ export function makeResidents(loc: any, T: any, fishNames: string[], birdNames: 
       camAt.set(cam.x, cam.y, cam.z);
       clockMs = ms; inspectCool -= dt; admireCool -= dt; seeCool -= dt; showCool -= dt;
       items.tick(dt); tickDrift(dt); catchRain(dt);
-      if ((labT -= dt) < 0) { labT = 30; tickLab(); }
+      if ((labT -= dt) < 0) { labT = 30; tickLab(); chapter1Tick(); chapter2Tick(); }
       profBegin('殻'); husk.tick(clockMs); profEnd('殻');   // (the time the husks lie in the tide pool, confirmed as it passes)
       profBegin('縄'); cord.tick(clockMs, voyaging && wxNow ? (wxNow.windMeasured ?? wxNow.wind) : null); profEnd('縄');   // (the roof's time, the sun on the cords, a crossing's wind)
       if (!village.sailHost?.sites) sail.sites();   // (the pandanus by the shore stand from the first: found once, by a fixed search, and kept)
@@ -3784,6 +4113,11 @@ export function makeResidents(loc: any, T: any, fishNames: string[], birdNames: 
       // (those with a mind of their own keep looking while they work; something new stops them — between steps)
       // (asked while its body's needs come first — hungry, asleep — it does not leave the other waiting: a no, and why)
       for (const q of requests) if (q.status === 'open' && clockMs - q.at > 30e3) answer(byId[q.to], q, false, refuseWhy(byId[q.to]));
+      for (const q of requests) if (q.status === 'accepted') {
+        const a = agentOf(byId[q.to]), tries = a ? a.results.filter((x) => x.optionId === `give:${q.from}` && x.at >= q.at && x.outcome !== 'done' && x.outcome !== 'interrupted' && x.outcome !== 'accepted').length : 0;
+        if (tries >= 3) failRequest(q, '何度か届けに行ったが、渡せなかった');
+        else if (clockMs - q.at > 60 * 60e3) failRequest(q, '時間がたっても、届けられなかった');
+      }
       if ((lookT -= dt) < 0) { lookT = 1; for (const r of list) { const a = agentOf(r); if (!a || r.act === 'sleep' || r.talk) continue; a.look(observe(r));
         // (at the tide pool, it sees how the husks lying there are: only when it is there; noted once, as it changes)
         { const p = husk.sites().pool, seen = husk.lookIntoPool(r.id, Math.hypot(r.pos.x - p.x, r.pos.z - p.z) <= POOL_REACH_M ? 'here' : 'away', clockMs); if (seen) act(r, 'got', `潮だまりの殻を見た：${seen}`); }
@@ -3866,7 +4200,7 @@ export function makeResidents(loc: any, T: any, fishNames: string[], birdNames: 
     subjects: () => list.map((r) => r.subject),
     status(r) {
       const s = statusOf(r);
-      if (!r.sp.living || r.talk || r.act === 'sleep' || ['forage', 'eat', 'graze'].includes(r.task?.kind ?? '')) return s;
+      if (!s || !r.sp.living || r.talk || r.act === 'sleep' || ['forage', 'eat', 'graze'].includes(r.task?.kind ?? '') || /おなか|眠/.test(s)) return s;   // (no line: no aside on its own either)
       return s + (r.hunger > 0.6 ? '（おなかがすいている）' : r.sleepy > 0.7 ? '（ねむそう）' : '');
     },
     vitals(r) {
@@ -4018,7 +4352,7 @@ export function makeResidents(loc: any, T: any, fishNames: string[], birdNames: 
     if (seated.every((r) => fireUsed.has(r.id))) {
       const dot = seated.find((r) => r.id === 'dot'), rk = seated.find((r) => r.id === 'rakko');
       const asked = requests.some((q) => q.from === 'dot' && q.to === 'rakko' && (q.status === 'open' || q.status === 'accepted'));
-      if (dot && rk && (morningPlans.dot === 'hut') && !dot.holding && morningPlans.rakko !== 'eat' && !asked) {
+      if (dot && rk && (morningPlans.dot === 'hut') && !dot.holding && morningPlans.rakko !== 'eat' && !asked && canOfferWood(rk)) {
         { const m = phrase({ act: 'offer-help', to: 'dot', what: 'wood' }); fireQueue.push({ who: 'rakko', line: m.ja, isl: m.isl, en: m.en }); }
         { const m = phrase({ act: 'accept-help' }); fireQueue.push({ who: 'dot', line: m.ja, isl: m.isl, en: m.en }); }
         fireQueue.push({ who: '', line: 'help' });
@@ -4126,18 +4460,42 @@ export function makeResidents(loc: any, T: any, fishNames: string[], birdNames: 
       if (PLOTS.some((pl) => pl.ok && pl.s === 2 && growth(pl) >= 0.6)) parts.push({ who: 'dot', deed: 'harvest' });
     }
     for (const id of ['rakko', 'kame'] as const) if (seated.some((r) => r.id === id)) parts.push({ who: id, deed: 'eat' });
-    if (parts.length) out.push(say_(by, { act: 'assign', parts: parts.slice(0, 4) }));
+    // (one sentence for each: Dot's deeds joined, and those who eat beforehand together — a line each, PROGRAM.md §6; science, #179)
+    const dotDo = parts.filter((p) => p.who === 'dot').map((p) => p.deed), eaters = parts.filter((p) => p.deed === 'eat').map((p) => p.who);
+    if (dotDo.length) out.push(say_(by, { act: 'assign-prep', who: ['dot'], deeds: dotDo, by }));
+    if (eaters.length) out.push(say_(by, { act: 'assign-prep', who: eaters, deeds: ['eat'], by }));
     return out;
   }
   function swellMorning() {
     const w = wxNow, g = village.swellGuess;
-    if (!w || storm() || w.swellPeriod === undefined || w.swellPeriod < SWELL_T) return;
+    // (a long swell now, or one it saw at sea since the last gathering, with getting ready begun from then: told now)
+    const seen = prepActive() && village.prepBy === 'kame' && village.prepTold === false ? village.swellSeen : null;
+    const now = !!w && !storm() && w.swellPeriod !== undefined && w.swellPeriod >= SWELL_T;
+    if (!now && !seen) return;
+    const sw = now ? { swell: w!.swell ?? 0, period: w!.swellPeriod! } : seen!;
     qs('kame', { act: 'tell-guess', if: 'swell-long', then: 'typhoon' });
     if (g.hits + g.falses > 0) qs('kame', { act: 'tell-guess-status', held: g.hits >= g.falses, hits: g.hits, wrong: g.falses });
-    const txt = `朝の集まりで、カメマルが長いうねりの話をした（高さ${(w.swell ?? 0).toFixed(1)}m、${Math.round(w.swellPeriod)}秒ごと）`;
+    const txt = `朝の集まりで、カメマルが長いうねりの話をした（高さ${sw.swell.toFixed(1)}m、${Math.round(sw.period)}秒ごと）`;
     for (const r of list) if (r.task?.kind === 'fire') r.diary.push({ at: clockMs, text: txt, key: 'met', with: 'kame' });
-    if (!g.alarm) { g.alarm = clockMs; tell('fire', `カメマル：長いうねりが来ている。台風が来るかもしれない（${Math.round(w.swellPeriod)}秒ごとのうねり）`, byId.kame); }
-    if (!prepActive() && !fireQueue.some((q) => q.line.startsWith('prep:'))) fireQueue.push(...prepLines('kame', list.filter((r) => r.task?.kind === 'fire' && r.task.arrived)));
+    if (!g.alarm && now) { g.alarm = clockMs; tell('fire', `カメマル：長いうねりが来ている。台風が来るかもしれない（${Math.round(sw.period)}秒ごとのうねり）`, byId.kame); }
+    if ((!prepActive() || seen) && !fireQueue.some((q) => q.line.startsWith('prep:'))) fireQueue.push(...prepLines('kame', list.filter((r) => r.task?.kind === 'fire' && r.task.arrived)));
+  }
+  // (Kamemaru reads the swell whenever it is up and out at sea or watching it — not at the morning gathering only: the
+  // weather runs on the island's clock, its two days' warning are 3.7 real hours, and a gathering hardly ever fell in
+  // them (0 of 12 storms in 90 days; up and out, 4 — science, specs/storm-prep-habit.md). A long swell: it tells those
+  // near, getting ready begins from then (Dot hauls the raft up), and the proposal and who does what are said at the
+  // next gathering; the count of hits and misses as before (swellTick))
+  function swellWatch() {
+    const k = byId.kame, w = wxNow, g = village.swellGuess;
+    if (!k || !w || storm() || g.alarm || w.swellPeriod === undefined || w.swellPeriod < SWELL_T) return;
+    if (sleepTime(k, localHour(clockMs)) || !['watch', 'swim', 'graze'].includes(k.task?.kind ?? '')) return;
+    g.alarm = clockMs; village.swellSeen = { at: clockMs, swell: w.swell ?? 0, period: w.swellPeriod };
+    k.diary.push({ at: clockMs, text: `長いうねりが来ている（高さ${(w.swell ?? 0).toFixed(1)}m、${Math.round(w.swellPeriod)}秒ごと）。台風が来るかもしれない`, key: 'study' });
+    tell('weather', `カメマルが長いうねりに気づいた。台風が来るかもしれない（${Math.round(w.swellPeriod)}秒ごとのうねり）`, k);
+    const near = list.filter((x) => x !== k && !sleepTime(x, localHour(clockMs)) && !x.talk && Math.hypot(x.pos.x - k.pos.x, x.pos.z - k.pos.z) < 60).slice(0, 2);
+    for (const o of near) { const c = exchange(k, o); utter(k, { act: 'tell-storm', likely: true, by: 'swell' }, 0, c); utter(o, { act: 'noted' }, 2000, c); o.diary.push({ at: clockMs, text: 'カメマルから「台風が来るかもしれない」と聞いた', key: 'met', with: 'kame' }); }
+    if (!prepActive()) { village.stormPrep = clockMs; village.prepBy = 'kame'; village.prepSaved = []; village.prepTold = false; village.prepKnown = []; }
+    heardPrep(k.id, ...near.map((o) => o.id));
   }
   function swellTick() {
     const g = village.swellGuess; if (!g.alarm) return;
@@ -4166,7 +4524,9 @@ export function makeResidents(loc: any, T: any, fishNames: string[], birdNames: 
       const teller = seated.find((r) => r.id !== 'lantern' && lastNight!.heard.has(r.id)), absent = seated.find((r) => !lastNight!.heard.has(r.id));
       if (teller && absent) { eveDone.add('relay'); qs(teller.id, { act: 'relay', from: 'lantern', said: lastNight.f }); qs(absent.id, { act: 'noted' }); lastNight.heard.add(absent.id); absent.diary.push({ at: clockMs, text: `焚き火の会で、${teller.v.name}から、ランタンの朝の話（台風が来るかもしれない）を聞いた`, key: 'met', with: teller.id }); }
     }
-    const sage = seated.find((r) => r.id === 'kame') ?? ln;
+    // (Kamemaru says it if it is there, or on its way to the fire — then the lecture waits for it; Lantern if not coming)
+    const kame = list.find((r) => r.id === 'kame'), coming = !!kame && kame.task?.kind === 'fire' && !kame.task.arrived;
+    const sage = seated.find((r) => r.id === 'kame') ?? (coming ? undefined : ln);
     if (sage && clockMs - village.heardOkAt < 14 * 3.6e6 && clockMs - (village.taught['lecture:tell-seen'] ?? 0) > 3 * 86_400_000) {
       village.taught['lecture:tell-seen'] = clockMs; qs(sage.id, { act: 'lecture', deed: 'tell-seen', why: 'told-useful' });
     }
@@ -4194,10 +4554,10 @@ export function makeResidents(loc: any, T: any, fishNames: string[], birdNames: 
     if (seated.length >= 2 && !fireSaid) {
       fireSaid = true; tell('fire', '焚き火の会が始まった', seated[0]); eveDone.clear();
       const found = village.treasures.filter((t) => t.at > lastFireAt);
-      for (const t of found) { const f = list.find((r) => r.v.name === t.who); if (f) { const m = SAY.found(t.what); fireQueue.push({ who: f.id, line: m.ja, isl: m.isl, en: m.en }); } }
+      for (const t of found) { const f = list.find((r) => r.v.name === t.who); if (f) { const m = phrase({ act: 'found-put', thing: t.what }); fireQueue.push({ who: f.id, line: m.ja, isl: m.isl, en: m.en }); } }
       if (village.pier === 'none' && village.fires >= 2) {
-        { const m = SAY.proposePier(); fireQueue.push({ who: 'kame', line: m.ja, isl: m.isl, en: m.en }); }
-        for (const id of ['dot', 'rakko', 'lantern']) { const m = SAY.agreePier(id); fireQueue.push({ who: id, line: m.ja, isl: m.isl, en: m.en }); }
+        { const m = phrase({ act: 'propose', deed: 'pier', mine: 'measure-place' }); fireQueue.push({ who: 'kame', line: m.ja, isl: m.isl, en: m.en }); }
+        for (const id of ['dot', 'rakko', 'lantern']) { const m = phrase({ act: 'agree-do', deed: id === 'dot' ? 'planks' : id === 'rakko' ? 'posts' : 'base-stones' }); fireQueue.push({ who: id, line: m.ja, isl: m.isl, en: m.en }); }
         fireQueue.push({ who: '', line: 'pier' });   // (then it is agreed)
       }
     }
@@ -4212,7 +4572,9 @@ export function makeResidents(loc: any, T: any, fishNames: string[], birdNames: 
       if (q.line === 'help') { morningHelp(); continue; }
       if (q.line.startsWith('settle:')) { settleDone(q.line.slice(7).split(','), seated); continue; }
       if (q.line.startsWith('prep:')) {
-        const by = q.line.slice(5); village.stormPrep = clockMs; village.prepBy = by; village.prepSaved = [];
+        const by = q.line.slice(5), began = prepActive() && village.prepBy === by;   // (begun already, from what it saw at sea: kept from then)
+        if (!began) { village.stormPrep = clockMs; village.prepSaved = []; village.prepKnown = []; } village.prepBy = by; village.prepTold = true;
+        heardPrep(by, ...seated.map((x) => x.id));
         tell('fire', `朝の集まりで、${byId[by].v.name}の知らせで台風に備えることが決まった`, seated[0]);
         for (const r of seated) { r.diary.push({ at: clockMs, text: `朝の集まりで、${byId[by].v.name}の知らせで、台風に備えることに決めた`, key: 'met', with: by }); const a = agentOf(r); if (a) a.why = '台風に備えることになった'; }
         continue;
@@ -4232,7 +4594,7 @@ export function makeResidents(loc: any, T: any, fishNames: string[], birdNames: 
       for (const f of seated) for (const t of seated) {
         if (f === t) continue;
         const ob = tip(f, t); if (!ob) continue;
-        { const m = SAY.share(ob.kind, ob.dist, t.id, true); fireQueue.push({ who: f.id, line: m.ja, isl: m.isl, en: m.en }); }
+        { const m = phrase({ act: 'tell-where', what: ob.kind as 'wood' | 'shell' | 'stone', metres: ob.dist, to: t.id as Who }); fireQueue.push({ who: f.id, line: m.ja, isl: m.isl, en: m.en }); }
         agentOf(t)?.hear(ob, f.id, `${f.v.name}によると、${ob.label}が${Math.round(ob.dist)}mほど先にある`, clockMs);
         t.diary.push({ at: clockMs, text: `焚き火の会で、${f.v.name}から${ob.label}の位置を聞いた（約${Math.round(ob.dist)}m）`, key: 'met', with: f.id });
       }
@@ -4379,7 +4741,7 @@ export function makeResidents(loc: any, T: any, fishNames: string[], birdNames: 
   (res as any).sailHost = sail;     // (and the sail's)
   (res as any).cordDev = cordDev; (res as any).cordHost = cord; (res as any).sailDev = sailDev; (res as any).sailHost = sail;
   (res as any).tell = tell;   // (for checks: the world telling an event, and whether it is a first)
-  (res as any).talkDev = { startTalk, utter };   // (for checks: a conversation, and a remark on its own — R-023)
+  (res as any).talkDev = { startTalk, utter, sayables, optionsFor, requests, agentOf };   // (for checks: a conversation, a remark on its own — R-023 — and Rakko's offer of wood — R-026)
   // wake up where they were, and catch up on the hours nobody was watching
   initStudyPlaces();
   const behind = load(Date.now());
@@ -4397,6 +4759,28 @@ export function makeResidents(loc: any, T: any, fishNames: string[], birdNames: 
     res.onEvent = quiet;
     for (const r of list) { r.saying = ''; r.sayUntil = 0; }
   }
+  firstLoad();
   for (const r of list) placeY(r);
   return res;
+  // The first load from the island to the south (案 A: the owner, 2026-10-27; the amounts the science team's,
+  // specs/early-science-bootstrap.md, cc6862d): they came over with 25 kg of clay — the pit's lining and a batch to
+  // soak, as far as the cook pot and the lamp dish, not the rest — and 7 kg of bamboo, a raft load, on the shelf by the
+  // hut. What more the work wants is a reason to cross; no reeds: found when the island is reached. Once, with a mark in
+  // the save; an island that has some already gets only what it lacks (5 kg of clay at most once the pit is lined).
+  function firstLoad() {
+    if (village.firstLoad) return;
+    const has = (id: string) => Object.values(lab.lots).filter((l) => l.materialId === id).reduce((n, l) => n + l.amount.value, 0);
+    const clayMg = Math.max(0, (village.clayPit ? 5e6 : 25e6) - has('raw_clay')), bambooMg = Math.max(0, 7e6 - has('bamboo'));
+    const lots: string[] = [];
+    if (clayMg > 0) lots.push(addLot(lab, { lotId: `lot:south-near:first:${++lab.seq}`, materialId: 'raw_clay', amount: { value: clayMg, unit: 'mg' }, location: 'shelf', quality: { ...RAW_CLAY_SOUTH } }).lotId);
+    if (bambooMg > 0) {
+      const k = bambooMg / (BAMBOO_SOUTH.dry_mg + BAMBOO_SOUTH.water_mg);   // (a part of a raft load: dry and water in proportion)
+      lots.push(addLot(lab, { lotId: `lot:south-near:first:${++lab.seq}`, materialId: 'bamboo', amount: { value: bambooMg, unit: 'mg' }, location: 'shelf', quality: { ...BAMBOO_SOUTH, dry_mg: Math.round(BAMBOO_SOUTH.dry_mg * k), water_mg: bambooMg - Math.round(BAMBOO_SOUTH.dry_mg * k) } }).lotId);
+    }
+    village.firstLoad = { at: clockMs, clayMg, bambooMg, lots };
+    if (!lots.length) return;
+    const what = [clayMg ? `粘土 ${Math.round(clayMg / 1e5) / 10}kg` : '', bambooMg ? `竹 ${Math.round(bambooMg / 1e5) / 10}kg` : ''].filter(Boolean).join('・');
+    for (const r of list) if (r.id === 'dot' || r.id === 'lantern') r.diary.push({ at: clockMs, text: `南のすぐ近くの島から運んできた最初の荷：${what}（小屋の棚）`, key: 'got' });
+    drawStore();
+  }
 }

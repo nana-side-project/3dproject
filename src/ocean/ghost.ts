@@ -70,19 +70,21 @@ export function inTheWay(p: GhostPlant, eye: THREE.Vector3, pts: THREE.Vector3[]
 
 /** The plants of a sea that may be seen through, and how much each is now. */
 export function makeGhosts() {
-  let fixed: GhostPlant[] = [], moving: GhostPlant[] = [];   // (fixed: the beach's, placed once; moving: the forest's, refilled as the camera goes)
+  let fixed: GhostPlant[] = [];   // (the beach's, placed once)
+  const moving = new Map<string, GhostPlant[]>();   // (those refilled as the camera goes: the forest's; Dot's world's beach trees)
   const live = new Set<GhostPlant>();   // (those not at rest at 0)
   let since = EVERY, held: (() => THREE.Vector3[]) | null | undefined;   // (held: LAB, the points as set by hand)
   const write = (p: GhostPlant) => { const c = p.mesh.instanceColor; if (c && p.i < c.count) { (c.array as Float32Array)[p.i * 3] = p.g; c.needsUpdate = true; } };
   return {
     /** The beach's plants (once, as built). */
     setFixed(list: GhostPlant[]) { fixed = list; },
-    /** The forest's drawn trees (each time it is refilled): those faint before keep how faint they were. */
-    setMoving(list: GhostPlant[]) {
-      const was = new Map<string, GhostPlant>(); for (const p of moving) if (p.g > 0 || p.t > 0) was.set(p.key, p);
-      for (const p of live) if (moving.includes(p)) live.delete(p);
-      moving = list;
-      for (const p of moving) { const o = was.get(p.key); if (o) { p.g = o.g; p.t = o.t; live.add(p); } write(p); }
+    /** Drawn trees refilled as the camera goes (each time: the forest's, or `name`'s): those faint before keep how faint they were. */
+    setMoving(list: GhostPlant[], name = 'forest') {
+      const old = moving.get(name) ?? [];
+      const was = new Map<string, GhostPlant>(); for (const p of old) if (p.g > 0 || p.t > 0) was.set(p.key, p);
+      for (const p of old) live.delete(p);
+      moving.set(name, list);
+      for (const p of list) { const o = was.get(p.key); if (o) { p.g = o.g; p.t = o.t; live.add(p); } write(p); }
     },
     /** Each frame: which plants are in the way of the eye to the points (head, middle, feet of the one watched — asked
      *  for only when it is worked out again; none: all come back), and each eased toward it. */
@@ -93,7 +95,7 @@ export function makeGhosts() {
         since = 0;
         const pts = ask ? ask() : null;
         const reach = pts ? Math.max(...pts.map((q) => Math.hypot(q.x - eye.x, q.z - eye.z))) + 6 : 0;
-        for (const list of [fixed, moving]) for (const p of list) {
+        for (const list of [fixed, ...moving.values()]) for (const p of list) {
           const near = pts && Math.abs(p.x - eye.x) < reach && Math.abs(p.z - eye.z) < reach;
           const t = near && inTheWay(p, eye, pts!) ? 1 : 0;
           if (t !== p.t) { p.t = t; live.add(p); }

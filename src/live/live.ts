@@ -1,7 +1,8 @@
 // The live screen (?live): the island streamed as it is, through "the observation window" (docs/proposals/viewer-
 // design-2026-10-16/screens/README.md, v2 2026-10-17). It only reads the world as it already is — who is being followed,
 // the words the world has for what it is doing, the island's date and time — and gives nothing back: no sense(), no
-// options, nothing to a resident's mind. The app's own controls are put away; the drone follows each resident in turn.
+// options, nothing to a resident's mind. The app's own controls are put away; the drone follows the residents by what is
+// going on with each (director.ts).
 // Fonts are the stream PC's own files (OFL, @fontsource): no request leaves the machine for them.
 import '@fontsource/zen-old-mincho/500.css';
 import '@fontsource/zen-old-mincho/600.css';
@@ -18,6 +19,10 @@ import { glyphs, LEX } from '../robots/islandlang';
 import { luminance, brightTenth, hazeFor, hazeStyle } from './scrim';
 import { statusEn, firstEn, asLine, FIXED_EN, NAMES_EN } from './en';
 import { captionSender } from './captions';
+import { makeDirector } from './director';
+import { chapter1 } from '../world/chapter1';
+import { chapter2 } from '../world/chapter2';
+import { chapterView, startCard, endCard, goneCard, chapter2View, startCard2, endCard2, chapterShown } from './chapter-line';
 
 export interface LiveCtx {
   residents(): any | null;           // the island's residents, once the island is built
@@ -25,12 +30,10 @@ export interface LiveCtx {
   watch(r: any): void;               // follow this one
   clockMs(): number;
   tz(): number;
+  cam?(who: string, pri: number, kind: string, why: string): void;   // (each change of who is followed, for the log: ?rehearsal)
 }
 /** The drone's number for each one it follows (01–04; 13 is the island round, later). */
 const DORON: Record<string, string> = { dot: '01', rakko: '02', kame: '03', lantern: '04' };
-const ORDER = ['dot', 'rakko', 'kame', 'lantern'];
-const TURN_S = 360;   // (each one followed for six minutes, then the next one awake)
-
 export function makeLive(ctx: LiveCtx) {
   document.body.classList.add('live');
   // (?lang=en: the same window in English — the world's words turned on this side only: src/live/en.ts; ?captions=<url>:
@@ -45,22 +48,17 @@ export function makeLive(ctx: LiveCtx) {
   root.innerHTML = `
     <div class="brand"><div class="en">UTSUSHIYO PROJECT</div><div class="ja"><i class="ser">Series 1</i>${en ? FIXED_EN.brand : 'ルマウ'}</div></div>
     <div class="when"><div><span class="date"></span><span class="time"></span></div><div class="ai">${en ? FIXED_EN.ai : '住人はAIです ・ 映像は自動で撮影しています'}</div></div>
+    <div class="chap fade off"><div class="c1"><span class="no"></span><span class="nm"></span><span class="dy"></span></div><div class="way fade"></div><div class="cargo fade"></div></div>
     <div class="band fade off"><div class="doron"><span class="n"></span>DORON</div>
-      <div class="who"><span class="isl-name"></span><span class="name"></span><span class="line"></span></div><div class="status fade"></div></div>
+      <div class="who"><span class="isl-name"></span><span class="name"></span><span class="line"></span></div><div class="status fade"></div><div class="trial fade off"><span class="k"></span><span class="t"></span></div></div>
     <div class="card fade off"><div class="rule"></div><div class="head">${en ? FIXED_EN.first : '島で初めて'}</div><div class="what"></div><div class="at"></div><div class="rule"></div></div>
     <div class="sub fade off"><div class="who"><span class="line"></span><span class="name"></span></div><div class="isl-line"></div><div class="tr"></div></div>`;
   document.body.appendChild(root);
   const $ = (s: string) => root.querySelector(s) as HTMLElement;
-  const band = $('.band'), status = $('.status');
+  const band = $('.band'), status = $('.status'), trialEl = $('.band .trial');
   const measure = document.createElement('canvas').getContext('2d')!;
-  let turn = 0, tick = 0, shownFor = '', shownText = '', swapT = 0;
+  let tick = 0, shownFor = '', shownText = '', swapT = 0;
 
-  const awake = (r: any) => r.act !== 'sleep' && r.task?.kind !== 'sleep' && !(r.task?.kind === 'voyage' && r.task.data?.started);   // (asleep, or away at sea: not followed)
-  function next(R: any) {
-    const now = ctx.watched(), i = now ? ORDER.indexOf(now.id) : -1;
-    for (let k = 1; k <= ORDER.length; k++) { const r = R.list.find((x: any) => x.id === ORDER[(i + k) % ORDER.length]); if (r && awake(r)) return r; }
-    return now ?? R.list.find((x: any) => x.id === 'dot');
-  }
   // (the line fits the band's width at its own size and face: broken after a 、 or 。 if not)
   const fits = (line: string) => { measure.font = `500 ${status.style.fontSize || getComputedStyle(status).fontSize} ${en ? "'Cormorant Garamond'" : "'Zen Old Mincho'"}`; return measure.measureText(line).width <= innerWidth * 0.5 - innerHeight / 1080 * 24; };
   function show(r: any, text: string) {
@@ -104,17 +102,19 @@ export function makeLive(ctx: LiveCtx) {
     if (sub.classList.contains('off')) fill(); else { sub.classList.add('off'); setTimeout(() => { if (subKey === key) fill(); }, 600); }
   }
 
+  const director = makeDirector({ residents: ctx.residents, watched: ctx.watched, watch: ctx.watch, cam: ctx.cam, speaking: () => !!subKey });
   function update(dt: number) {
     const R = ctx.residents();
     if (!R) return;
-    turn -= dt;
-    let r = ctx.watched();
-    if (!r || turn <= 0 || (!awake(r) && turn < TURN_S - 30)) { const n = next(R); if (n && n !== r) ctx.watch(n); r = n; turn = TURN_S; }   // (one that falls asleep is left after half a minute)
+    director.tick(dt);   // (whom the drone follows: director.ts)
+    const r = ctx.watched();
     subtitle(R, r);   // (every frame: a line begins and ends with the voice)
     if ((tick -= dt) > 0) return; tick = 1;   // (the words read once a second)
     $('.when .date').textContent = dateOf(ctx.clockMs());
     $('.when .time').textContent = localTimeString(ctx.clockMs(), ctx.tz());
+    chapterLine(R);
     if (!r) { band.classList.add('off'); return; }
+    trialLine(r);
     const text = trimStatus(R.status(r) as string);   // (as it is shown: the metres still to go taken out, or the line would fade out and back with the same words each time they change — science, #121)
     if (r.id !== shownFor) {   // (another one followed: the band fades out, changes, fades in)
       band.classList.add('off'); shownFor = r.id; shownText = text; swapT = 0.6;
@@ -124,11 +124,74 @@ export function makeLive(ctx: LiveCtx) {
       setTimeout(() => { show(r, text); status.classList.remove('off'); }, 600);
     }
   }
+  // The trial line under the status (PROGRAM.md §1-2, R-030): what the one followed is trying, in its own words, while a
+  // goal of its own lasts (never its habits); for 12 s after a result, how its last try came out, in the words that try
+  // was shown in — 確かめた, 違っていた, やりとげた (only as the world checked it), まだ届かない, やってみた (its steps
+  // taken, nothing to check), うまくいかなかった ・ the world's reason — then what it is trying now, or nothing until
+  // it decides. Its words only: none that fail the rule (residents.ts trialWords), and none on the English screen until
+  // there are English words. Two lines at most (live.css).
+  const TRIAL_K: Record<string, [string, string, boolean]> = { confirmed: ['確かめた', 'Confirmed', true], refuted: ['違っていた', 'Not so', false], done: ['やりとげた', 'Done', true], 'not-yet': ['まだ届かない', 'Not there yet', false], 'steps-done': ['やってみた', 'Tried it', false], failed: ['うまくいかなかった', "Didn't work", false] };
+  let trialShown = '';
+  function trialLine(r: any) {
+    const d = r?.tried, fresh = !!d?.text && ctx.clockMs() - d.at < 12e3, t = r?.trial;
+    const k = fresh ? TRIAL_K[d.result] : t?.active ? (['試み', 'Trying', true] as [string, string, boolean]) : null;
+    const head = k ? `${k[0]}${fresh && d.result === 'failed' && d.outcome ? ` ・ ${d.outcome}` : ''}` : '';
+    const words = (fresh ? d.text : t?.active ? t.text : '') ?? '';
+    const key = k && words && !en ? `${r.id}|${head}|${words}` : '';
+    if (key === trialShown) return; trialShown = key;
+    if (!key) { trialEl.classList.add('off'); return; }
+    $('.band .trial .k').textContent = head; trialEl.classList.toggle('gold', k![2]);
+    $('.band .trial .t').textContent = words;
+    trialEl.classList.remove('off');
+  }
+  // The chapter at the top left (PROGRAM.md §2-1, plan B — CHAPTER1_END.md §4): its name and day, the way (done in sea
+  // green, the next underlined in sand, the rest faint), what was brought in four words (sand when nearly gone or gone);
+  // a word changed is swapped over 0.6 s. Its cards: the start (the question) when the first load has just come, the end
+  // when the south island's load is on the shelf — each once (kept in this browser), and only as it happens, not on
+  // opening the page later. A minute after chapter 1's end card, chapter 2 (PROGRAM.md §2-2, D34): its start card comes,
+  // and the block fades over to it as the card is on (chapterShown); it has no load's line. It ends with the first lamp:
+  // its end card a minute after the first lamp's own, the block two minutes more, then gone until chapter 3 has its words.
+  // An island whose first lamp was lit before has no chapter 2: chapter 1's block goes two minutes after its end.
+  let chapShown = 0, chapSwapAt = 0, start2Waiting = false;
+  const chap = $('.chap'), shownPart: Record<string, string> = {}, sep = `<span class="sep">${en ? '·' : '・'}</span>`;
+  const once = (k: string) => { try { if (localStorage.getItem(k)) return false; localStorage.setItem(k, '1'); } catch { /* the card all the same */ } return true; };
+  const swap = (sel: string, html: string) => {
+    if (shownPart[sel] === html) return; const el = $(sel), first = shownPart[sel] === undefined; shownPart[sel] = html;
+    if (first) { el.innerHTML = html; return; }
+    el.classList.add('off'); setTimeout(() => { if (shownPart[sel] === html) { el.innerHTML = html; el.classList.remove('off'); } }, 600);
+  };
+  function chapterLine(R: any) {
+    const c = R.village ? chapter1(R.village) : null, c2 = R.village ? chapter2(R.village) : null, now = ctx.clockMs();
+    const two = !!c2 && now >= c2.began + 60e3;
+    if (c) {
+      if (now - c.began < 5 * 60e3 && once(`seaglass.chapter1:${c.began}:start`)) { const k = startCard(en); queue.push({ head: k.head, text: esc(k.what), at: c.began }); }
+      if (c.ended !== null && now - c.ended < 5 * 60e3 && once(`seaglass.chapter1:${c.began}:end`)) { const k = endCard(c, en); queue.push({ head: k.head, text: esc(k.what), at: c.ended }); }
+      // (what was brought run out: a world's event in the milestone's card, not the chapter's end — D33)
+      for (const m of ['clay', 'bamboo'] as const) { const at = c.gone[m]; if (at !== null && at > 0 && now - at < 5 * 60e3 && once(`seaglass.chapter1:${c.began}:${m}-gone`)) { const k = goneCard(m, en); queue.push({ head: k.head, text: esc(k.what), at }); } }
+    }
+    if (c2 && two) {
+      if (now - c2.began < 6 * 60e3 && once(`seaglass.chapter2:${c2.began}:start`)) { const k = startCard2(en); start2Waiting = true; queue.push({ head: k.head, text: esc(k.what), at: c2.began + 60e3, shown: () => { start2Waiting = false; } }); }
+      if (c2.ended !== null && c2.ended > 0 && now >= c2.ended + 60e3 && now - c2.ended < 6 * 60e3 && once(`seaglass.chapter2:${c2.began}:end`)) { const k = endCard2(en); queue.push({ head: k.head, text: esc(k.what), at: c2.ended + 60e3 }); }
+    }
+    const n = chapterShown(c, c2, now, start2Waiting);
+    if (!n) { chap.classList.add('off'); return; }
+    // (another chapter: the block fades out, changes, fades in)
+    if (n !== chapShown) {
+      if (chapShown && !chap.classList.contains('off')) { chap.classList.add('off'); chapSwapAt = performance.now() + 600; return; }
+      if (performance.now() < chapSwapAt) return;
+      chapShown = n; for (const k of Object.keys(shownPart)) delete shownPart[k];
+    }
+    const v = n === 2 ? chapter2View(c2!, now, ctx.tz(), en) : chapterView(c!, now, ctx.tz(), en);
+    $('.chap .no').textContent = v.no; $('.chap .nm').textContent = v.name; $('.chap .dy').textContent = v.day;
+    swap('.chap .way', v.way.map((x) => `<span class="${x.k}">${esc(x.w)}</span>`).join(sep));
+    swap('.chap .cargo', v.cargo ? `${esc(v.cargo.label)}${v.cargo.items.map((x) => `<span class="lv${x.low ? ' low' : ''}">${esc(x.w)}</span>`).join(sep)}` : '');
+    chap.classList.remove('off');
+  }
   // The haze under each group of words (src/live/scrim.ts): once a second, right after the frame is drawn, the picture
   // shrunk to 64 × 36; the bright tenth of what lies behind each group sets its haze, eased over a second (CSS).
   const SW = 64, SH = 36, shrink = document.createElement('canvas'); shrink.width = SW; shrink.height = SH;
   const sctx = shrink.getContext('2d', { willReadFrequently: true })!;
-  const groups = ['.brand', '.when', '.band', '.sub', '.card'].map((sel) => { const el = $(sel), haze = document.createElement('div'); haze.className = 'haze'; root.insertBefore(haze, root.firstChild); return { el, haze, h: 0 }; });
+  const groups = ['.brand', '.when', '.chap', '.band', '.sub', '.card'].map((sel) => { const el = $(sel), haze = document.createElement('div'); haze.className = 'haze'; root.insertBefore(haze, root.firstChild); return { el, haze, h: 0 }; });
   let sampleAt = 0;
   function sample(canvas: HTMLCanvasElement) {
     const now = performance.now(); if (now - sampleAt < 1000) return; sampleAt = now;
@@ -149,14 +212,19 @@ export function makeLive(ctx: LiveCtx) {
     }
   }
   /** For the stream's log (the test week): how hazy each group is now, 0–1. */
-  const haze = () => Object.fromEntries(groups.map((g, i) => [['brand', 'when', 'band', 'sub', 'card'][i], +g.h.toFixed(3)]));
+  const haze = () => Object.fromEntries(groups.map((g, i) => [['brand', 'when', 'chap', 'band', 'sub', 'card'][i], +g.h.toFixed(3)]));
 
   // The milestone card (viewer design v2 §4): when the world marks an event the first of its kind on the island, at the
   // upper centre between two gold hair lines — "島で初めて", the event's own sentence (to its first 。), the island's
-  // date and time — for about eight seconds, then it fades. Several at once wait their turn.
-  const card = $('.card'), queue: { text: string; at: number }[] = [];
+  // date and time — for about eight seconds, then it fades. Several at once wait their turn. The chapter's own cards
+  // (its start and end) take the same place with their own heading.
+  const card = $('.card'), queue: { head?: string; text: string; at: number; shown?: () => void }[] = [];
   let cardT = 0;
-  function event(_kind: string, text: string, r: any, meta?: { milestone?: string }) {
+  function event(kind: string, text: string, r: any, meta?: { milestone?: string; trial?: { kind: string; result?: string; text: string | null } }) {
+    director.event(kind, text, r, meta);   // (ranked for the drone)
+    // (a trial begun or come out, with words to show: rank 1 — not its steps taken with nothing to check, which may be many:
+    // on one already followed, only the heading changes, PROGRAM.md §4)
+    if (meta?.trial?.text && meta.trial.result !== 'steps-done') director.trial(r, meta.trial.result ?? 'start', meta.trial.text);
     if (!meta?.milestone) return;
     const ja = trimStatus(text.split('。')[0]), esc1 = (t: string) => t.replace(/[<&]/g, (c) => (c === '<' ? '&lt;' : '&amp;'));
     const html = en ? firstEn(meta.milestone, r?.v?.name ?? '', true) : esc1(ja);
@@ -168,10 +236,13 @@ export function makeLive(ctx: LiveCtx) {
     if (cardT > 0) { cardT -= dt; if (cardT <= 0) card.classList.add('off'); return; }
     if (cardT > -0.8) { cardT -= dt; return; }   // (a breath between two cards)
     const m = queue.shift(); if (!m) return;
+    $('.card .head').textContent = m.head ?? (en ? FIXED_EN.first : '島で初めて');
     $('.card .what').innerHTML = m.text;   // (escaped as it was made: only an island's word in italics)
     $('.card .at').innerHTML = `${esc(dateOf(m.at))} <span class="t">${localTimeString(m.at, ctx.tz())}</span>`;
-    card.classList.remove('off'); cardT = 8;
+    card.classList.remove('off'); cardT = 8; m.shown?.();
   }
 
-  return { update: (dt: number) => { update(dt); cardTick(dt); }, sample, haze, event };
+  /** A try's result, for the trials' screen (PROGRAM.md §1): the drone goes to the one whose try it was (rank 1). */
+  const trial = (r: any, outcome: string, text: string) => director.trial(r, outcome, text);
+  return { update: (dt: number) => { update(dt); cardTick(dt); }, sample, haze, event, trial };
 }

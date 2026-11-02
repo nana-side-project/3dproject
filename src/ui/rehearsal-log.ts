@@ -14,12 +14,21 @@
 //   card    a milestone card put up on the live screen: its words
 //   sub     a subtitle put up: who speaks, and what they said as the screen gives it (the residents' own words)
 //   sea     every five minutes: the sea's height on the world's clock (seaLevel) and as drawn
+//   trial   a resident's trial (PROGRAM.md §1, R-030): kind start (begun: its words) or result (confirmed / refuted / done /
+//           not-yet / steps-done / failed, with the world's outcome for a failure, the goal's value now), who, text (null:
+//           its words did not pass the rule, nothing shown)
+//   audio   every minute: whether the sound is coming out (on / off / blocked); an event audio row too when M is
+//           pressed or the browser holds it
+//   cam     the live screen's drone (live.ts): who it follows now (who: dot / rakko / kame / lantern), the rank of what
+//           that one is doing (pri: 1 a moment decided, a result, a first; 2 together or talking; 3 work under way; 6 at
+//           rest — PROGRAM.md §4), what it is (kind) and why the drone went there (why: the event's words, or the rule);
+//           written when it changes whom it follows, and when the one followed changes rank
 // On the screen, only with ?rehearsal (never on the public stream): the time in Japan in the bottom right corner, inside
 // the margin (5% in, 8% up; 22 px at 1080p, the live screen's ink3), for laying the recording of the stream beside this
 // log (REHEARSAL.md §6).
 // Kept in this browser as it goes (IndexedDB, so a reload loses nothing), written out — once the stream has been stopped,
-// or the browser's download notice is streamed with the picture — with Alt+Shift+R or
-// seaglassRehearsal.download(); seaglassRehearsal.clear() starts afresh; seaglassRehearsal.saveOut() writes out the island's
+// or the browser's download notice is streamed with the picture — with seaglassRehearsal.download() from the console
+// (no key: Chrome took Alt+Shift+R for its reading mode, R-025); seaglassRehearsal.clear() starts afresh; seaglassRehearsal.saveOut() writes out the island's
 // save (seaglass.*, never the API key). Nothing is sent anywhere. The steps: docs/rehearsal/RUNBOOK.md.
 import { prof } from '../core/prof';
 import { watchAi } from '../robots/mind';
@@ -28,8 +37,9 @@ export type RehearsalSource = {
   island: () => number; world: () => number | null;
   seaWorld: () => number | null; seaDrawn: () => number;
   status: () => string;
+  audio?: () => string;   // (the sound: on, off, or blocked)
 };
-export type RehearsalLog = { frame(ts: number): void; frameEnd(): void; event(kind: string, text: string, shown?: boolean): void };
+export type RehearsalLog = { frame(ts: number): void; frameEnd(): void; event(kind: string, text: string, shown?: boolean): void; trial(who: string, t: Record<string, unknown>): void; cam(who: string, pri: number, kind: string, why: string): void };
 
 const DB = 'seaglass.rehearsal', STORE = 'lines';
 const jst = (ms: number, milli = false) => new Date(ms + 9 * 3600e3).toISOString().slice(0, milli ? 23 : 19) + '+09:00';
@@ -76,7 +86,6 @@ export function startRehearsalLog(src: RehearsalSource): RehearsalLog {
     a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 10000);
   };
   (window as any).seaglassRehearsal = { download, clear, flush, text: all, saveOut };
-  addEventListener('keydown', (e) => { if (e.altKey && e.shiftKey && e.code === 'KeyR') { e.preventDefault(); void download(); } });
   addEventListener('error', (e) => row('event', { kind: 'error', text: String(e.message).slice(0, 200) }));
   addEventListener('unhandledrejection', (e) => row('event', { kind: 'error', text: String((e.reason as Error)?.message ?? e.reason).slice(0, 200) }));
   let hiddenAt = 0;
@@ -92,7 +101,7 @@ export function startRehearsalLog(src: RehearsalSource): RehearsalLog {
 
   // frames: the interval between two (what a viewer sees), and each one's own work (what the app spent on it)
   let lastTs = 0, workT = 0, lastWork = 0, lastParts: Record<string, number> = {}, sec = 0, gaps: number[] = [], workMax = 0;
-  let statusWas = '', flushT = 0, seaT = 0, watched = false;
+  let statusWas = '', flushT = 0, seaT = 0, audioT = 0, watched = false;
   // (the live screen's card and subtitle: written as each is put up — the screen is made once the island is open)
   const watchLive = () => {
     const card = document.querySelector('#live .card'), sub = document.querySelector('#live .sub');
@@ -111,6 +120,7 @@ export function startRehearsalLog(src: RehearsalSource): RehearsalLog {
     let st = ''; try { st = src.status(); } catch (e) { /* none */ }
     if (st !== statusWas) { statusWas = st; row('status', { text: st }, now); }
     if (now - seaT >= 300e3) { seaT = now; let w: number | null = null; try { w = src.seaWorld(); } catch (e) { /* no island */ } row('sea', { seaWorld: w == null ? null : +w.toFixed(3), seaDrawn: +src.seaDrawn().toFixed(3) }, now); }
+    if (src.audio && now - audioT >= 60e3) { audioT = now; row('audio', { state: src.audio() }, now); }
     if (now - flushT >= 30e3) { flushT = now; void flush(); }
   };
   return {
@@ -129,5 +139,7 @@ export function startRehearsalLog(src: RehearsalSource): RehearsalLog {
       lastParts['その他'] = Math.max(0, lastWork - (lastParts['住人'] ?? 0) - (lastParts['描画'] ?? 0) - (lastParts['画面読み'] ?? 0));
     },
     event(kind, text, shown) { row('event', { kind, text, ...(shown === undefined ? {} : { shown }) }); },
+    trial(who, t) { row('trial', { who, ...t }); },
+    cam(who, pri, kind, why) { row('cam', { who, pri, kind, why }); },
   };
 }
