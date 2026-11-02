@@ -3,7 +3,8 @@
 //   A a try's sound: held (confirmed, done) bright, not held (refuted, not yet, failed) low, decided one soft note; its
 //     steps taken with nothing to check, or no words on the screen: none
 //   B one every three minutes at most: one too soon is let go, not kept for later; a card's (first) sounds all the same
-//     and does not count
+//     and does not count; nor does the small knock five minutes before a gathering — a result a minute after it sounds
+//     (viewer design on #215)
 //   C two together: the stronger (a card over a try's result, a result over a try decided, over the customs)
 //   D never over a voice: it waits for the voice to end; one that goes on too long lets a try's sound go — a card's
 //     sounds all the same, after three seconds (the card is on for eight)
@@ -33,6 +34,8 @@ const run = (c: ReturnType<typeof makeCues>, from: number, to: number) => { for 
   c.want('bad', CUE_GAP_MS + 10); run(c, CUE_GAP_MS + 10, CUE_GAP_MS + 1000);
   run(c, CUE_GAP_MS + 1000, CUE_GAP_MS + 300_000);
   want('B one every three minutes: one too soon let go, not kept; a card\'s all the same, not counted', played.join(' ') === 'good first bad' && log.includes('decided:3分以内'), `${played.join(' ')} | ${log.join(' ')}`);
+  const k = rig(); k.c.want('gather-soon', 0); run(k.c, 0, 1000); k.c.want('good', 60_000); run(k.c, 60_000, 61_000);
+  want('B the small knock before a gathering is not counted: a result a minute after it sounds', k.played.join(' ') === 'gather-soon good', `${k.played.join(' ')} | ${k.log.join(' ')}`);
 }
 { // C
   const { c, played } = rig();

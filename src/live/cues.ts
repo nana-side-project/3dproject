@@ -1,6 +1,7 @@
 // The notification sounds of the live screen (viewer design PROGRAM.md §5-3): which to sound, and when. The sounds
 // themselves are audio.ts's (cue). The same sound for the same kind of moment, so that one looking away learns "that
-// sound: look". At most one every three minutes — a card's (a first on the island, a chapter's start or end) excepted;
+// sound: look". At most one every three minutes — a card's (a first on the island, a chapter's start or end) and the
+// small knock before a gathering excepted (neither counts: viewer design on #215, the knock kept a result quiet);
 // two at once, the stronger; never over a voice: after it ends (§5-1). Only from what the screen already shows; it
 // gives nothing back to the world.
 
@@ -35,11 +36,11 @@ export function makeCues(play: (c: Cue) => void, speaking: () => boolean, log: C
     },
     tick(now: number): Cue | null {
       if (!pend) return null;
-      const card = pend.c === 'first';
+      const card = pend.c === 'first', counts = !card && pend.c !== 'gather-soon';   // (the card's and the small knock: not counted)
       if (!card && now - pend.at < CUE_TOGETHER_MS) return null;
       if (!card && now - last < CUE_GAP_MS) { drop('3分以内'); return null; }
       if (speaking()) { if (now - pend.at < (card ? CUE_CARD_WAIT_MS : CUE_VOICE_WAIT_MS)) return null; if (!card) { drop('声が続いた'); return null; } }
-      const c = pend.c; pend = null; if (!card) last = now;
+      const c = pend.c; pend = null; if (counts) last = now;
       play(c); log(c, true, ''); return c;
     },
   };
