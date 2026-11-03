@@ -288,14 +288,18 @@ export function makeBirds(specs: BirdSpec[], group: THREE.Object3D, sea?: BirdSe
             else if (b.state === 'fly' && b.stateT > 20 && R() < dt / 25 && !lure && b.visit <= 0) b.altT = rr(sp.alt[0], sp.alt[1]);
             if (b.state === 'land') {
               b.altT = sw; b.speed = Math.max(2.5, b.speed - dt * 2); wantLegs = 1; wantTail = 1; flapA = 0.8; b.flapping = Math.max(b.flapping, b.p.y < sw + 2 ? 0.3 : 0);
-              if (b.p.y < sw + 0.25) { b.state = 'rest'; b.stateT = 0; b.p.y = sw; b.tx = 0; tell(F, b, 'land', `${sp.ja}が水面に降りて羽を休めている`); }
+              // (carried in over the shallows or the land and not down within the half minute: given up, flying on)
+              if (b.stateT > 25 && b.p.y > sw + 1) { b.state = 'fly'; b.stateT = 0; b.altT = rr(sp.alt[0], sp.alt[1]); }
+              else if (b.p.y < sw + 0.25) { b.state = 'rest'; b.stateT = 0; b.p.y = sw; b.tx = 0; tell(F, b, 'land', `${sp.ja}が水面に降りて羽を休めている`); }
             } else if (b.state === 'fly' && sp.rest > 0 && b.stateT > 30 && !lure && b.visit <= 0 && R() < dt * sp.rest / 90 && deep(b.p.x, b.p.z, 0.5)) { b.state = 'land'; b.stateT = 0; }
             // flap in bursts between glides; always when climbing or slow
             if (b.flapping > 0) b.flapping -= dt; else if (R() < dt * (1 - sp.glide) * 0.8) b.flapping = rr(0.8, 2.2);
           }
           // keep over the sea and clear of the land (and its trees)
-          const ground = sea ? sea.ground(b.p.x, b.p.z) : -1;
-          const vyT = clamp((Math.max(b.altT, sw + (b.state === 'land' ? 0.05 : b.state === 'skim' ? 0.3 : 0.4), ground + 10) - b.p.y) * (b.state === 'hover' ? 2 : b.state === 'chase' ? 1.2 : 0.6), b.state === 'chase' || b.state === 'skim' ? -8 : -3.5, 2.5);   // (a frigatebird stoops: down fast)
+          // (coming down to sit on the water, over water deep enough to sit on, the clearance over the bottom is let go:
+          // over a shallow lagoon it had held the bird ten metres above the sand, hanging there for good)
+          const ground = sea ? sea.ground(b.p.x, b.p.z) : -1, clear = b.state === 'land' && deep(b.p.x, b.p.z, 0.5) ? -1e9 : ground + 10;
+          const vyT = clamp((Math.max(b.altT, sw + (b.state === 'land' ? 0.05 : b.state === 'skim' ? 0.3 : 0.4), clear) - b.p.y) * (b.state === 'hover' ? 2 : b.state === 'chase' ? 1.2 : 0.6), b.state === 'chase' || b.state === 'skim' ? -8 : -3.5, 2.5);   // (a frigatebird stoops: down fast)
           b.vy += (vyT - b.vy) * Math.min(1, dt * (b.state === 'hover' ? 4 : 1.5));
           if (b.state !== 'hover' && (b.vy > 0.8 || b.speed < sp.speed * 0.7)) b.flapping = Math.max(b.flapping, 0.3);
           b.h += clamp(turn, -1.6, 1.6) * dt;
@@ -338,9 +342,11 @@ export function makeBirds(specs: BirdSpec[], group: THREE.Object3D, sea?: BirdSe
    *  sight, otherwise from out of sight behind, flying in. */
   const call = (id: string, cam: THREE.Vector3, fx: number, fz: number) => {
     const F = flocks.find((f) => f.sp.id === id && !f.sp.crowd); if (!F) return false;
-    const near = F.birds.slice().sort((a, b) => a.p.distanceToSquared(cam) - b.p.distanceToSquared(cam)).slice(0, 3);
+    // (the nearest three on the wing: those sitting on the water or under it are left be — and now that birds coming
+    // down do come down, the nearest three could all be sitting, and then none came)
+    const near = F.birds.filter((b) => b.state !== 'rest' && b.state !== 'under' && b.state !== 'dive')
+      .sort((a, b) => a.p.distanceToSquared(cam) - b.p.distanceToSquared(cam)).slice(0, 3);
     near.forEach((b, i) => {
-      if (b.state === 'rest' || b.state === 'under' || b.state === 'dive') return;
       if (birdUnseen(b.p, cam, fx, fz) && b.p.distanceTo(cam) > 60) {
         for (let k = 0; k < 20; k++) {
           const a = Math.atan2(-fz, -fx) + (i - 1) * 0.5 + (R() * 2 - 1) * 0.3, d = 40 + i * 6;
