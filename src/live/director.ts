@@ -27,8 +27,11 @@
 const ORDER = ['dot', 'rakko', 'kame', 'lantern'];
 const TURN_S = 75, P1_HOLD = 20, REST_MAX = 12, WORK_TURN = 180, LINE_WAIT = 10;
 const PLACE_HOLD = 12, OPEN_HOLD = 8, OPEN_GAP = 180, HERE_M = 12, ALT_S = 35;
-/** Which place each kind of the world's events happens at (for a first's card). */
-const PLACE_OF: Record<string, string> = { house: 'house', raft: 'beach', sail: 'beach', pit: 'fire', fire: 'fire' };
+/** Which place's camera shows each first's card (by the first's key — world/milestones.ts — not the event's kind; viewer
+ *  design on #241): what stands at the house or is made at its shelf → 06; the raft's → 07; the pots fired → 08. The rest
+ *  (the clay pit, the sail woven and the mast cut elsewhere, the crossings, the fibre and the rope) have none. */
+const FIRST_PLACE: Record<string, string> = { hut: 'house', 'house-roof': 'house', 'house-walls': 'house', house: 'house', wall: 'house', light: 'house',
+  'cook-pot': 'house', retort: 'house', 'weather-pot': 'house', raft: 'beach', rig: 'beach', lash: 'beach', 'fired-pot': 'fire' };
 const REST = new Set(['sleep', 'charge', 'rest', 'nap', 'float', 'idle', 'study-rest', 'study-pause', 'bask', 'groom', 'look', 'wander', 'shelter']);
 const TALK = new Set(['ask', 'give', 'tell', 'say', 'answer']);
 // (the world's events that are rank 1: a first; in its own mind, a goal set or a try's end; a crossing)
@@ -163,7 +166,7 @@ export function makeDirector(ctx: DirectorCtx) {
     tick(dt: number) { const R = ctx.residents(); if (!R) return; turn -= dt; clock += dt; if ((dirT -= dt) <= 0) { dirT = 0.5; direct(R); } },
     /** What the world tells (residents' onEvent), ranked. */
     event(kind: string, text: string, r: any, meta?: { milestone?: string }) {
-      if (meta?.milestone) call(r, 'first', text, PLACE_OF[kind]);
+      if (meta?.milestone) call(r, 'first', text, FIRST_PLACE[meta.milestone]);
       else if (kind === 'mind' && MIND1.test(text)) call(r, /目的/.test(text.split('：')[1]) ? 'decided' : 'result', text);
       else if (kind === 'map' || kind === 'sail' || kind === 'raft') call(r, 'crossing', text);
       else if (kind === 'weather' && /長いうねりに気づいた/.test(text)) call(r, 'storm', text);

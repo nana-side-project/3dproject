@@ -9,6 +9,7 @@
 //   event    a piece put on at the house, no card: as work (rank 3), no cut for it (MULTICAM.md §2-1 from here on)
 //   open     going to one at work by a place from far off: the place eight seconds first, then the one there
 //   first    a first of the island's at the house: the card's eight seconds on the house, then Dot (rank 1)
+//   light    the first lamp's card on the house's camera (8 s), then Lantern; the clay pit's first on no place
 //   gather   the fire's gathering: the house's wide shot while it lasts, one shot; ended, elsewhere
 //   work     long work by the house: the house and Dot in turn, 35 s each; after three minutes, the next one at work
 //   round    all at rest: the residents awake with the places between them, 75 s each — never a place after a place
@@ -81,6 +82,14 @@ function stage(list: any[], places = [{ subj: HOUSE, at: { lx: 0, lz: 0 } }, { s
   S.D.event('house', 'ドットが小屋の屋根を葺き終えた', dot, { milestone: 'hut' }); S.run(1);
   const on = S.on(), why = S.cams.at(-1)?.why ?? '', at = S.time(); S.until(() => S.on() === 'dot', 20);
   row(before === 'dot' && on === 'house' && /初めて/.test(why) && Math.abs(S.time() - at - 7.5) < 1.5 && S.cams.at(-1)?.pri === 1, `first: on ${before}; a first at the house → ${on} (${why.slice(0, 12)}…), then ${S.on()} after ${(S.time() - at + 1).toFixed(1)} s (rank ${S.cams.at(-1)?.pri})`);
+}
+{ // light (the first lamp: chapter 2's end — its card on the house's camera; the clay pit's on none: viewer design on #241)
+  const ln = mk('lantern', 'lamp', 2, 1), S = stage([ln, mk('kame', 'graze', -200, 90)], [{ subj: HOUSE, at: { lx: 0, lz: 0 } }], ln);
+  S.run(15); S.D.event('science', 'ランタン：島で初めて灯りをともした', ln, { milestone: 'light' }); S.run(1);
+  const on = S.on(), at = S.time(); S.until(() => S.on() === 'lantern', 20); const back = S.time() - at;
+  const d2 = mk('dot', 'dig', 1, 1), S2 = stage([d2, mk('kame', 'graze', -200, 90)], [{ subj: HOUSE, at: { lx: 0, lz: 0 } }], d2);
+  S2.run(15); S2.D.event('pit', 'ドットが粘土の池を掘った', d2, { milestone: 'clay-pit' }); S2.run(1);
+  row(on === 'house' && Math.abs(back - 7.5) < 1.5 && S2.on() === 'dot', `light: the first lamp → ${on}, then Lantern after ${(back + 1).toFixed(1)} s; the clay pit's first → ${S2.on()}`);
 }
 { // gather
   const dot = mk('dot', 'fire', 3, 2), rakko = mk('rakko', 'fire', 4, 3), S = stage([dot, rakko, mk('kame', 'graze', -200, 90)]);
