@@ -107,6 +107,12 @@ export function makeGhosts() {
         if (p.g === p.t && p.t === 0) live.delete(p);
       }
     },
+    /** A cut (the drone fleet, ADR 0010): a new shot is not faded into — which plants are in the way is worked out again
+     *  at once from where the camera now is, and each is at once as it should be (those in the old shot's way solid again). */
+    cut(eye: THREE.Vector3, ask: (() => THREE.Vector3[]) | null) {
+      since = EVERY; this.update(eye, ask, 0);
+      for (const p of live) { p.g = p.t; write(p); if (p.t === 0) live.delete(p); }
+    },
     /** LAB: hold the points by hand (null: none; undefined: back to the camera's). */
     lab(pts: THREE.Vector3[] | null | undefined) { held = pts === undefined ? undefined : pts && (() => pts); since = EVERY; },
     /** LAB: the growing beach plant nearest (x, z), as it is held here. */

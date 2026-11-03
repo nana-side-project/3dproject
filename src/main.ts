@@ -239,11 +239,18 @@ function fleetPlace(p: Pose) {
   drone.yaw = Math.atan2(-lx, -lz); drone.pitch = Math.atan2(ly, hyp(lx, lz));
   camera.position.copy(drone.pos); holdUnseen(2000);
 }
+/** Where the plants seen through are worked out to (#155): the head, middle and feet of the one watched; none in its eyes
+ *  (pov) or with none watched. */
+function ghostAsk(r: any): (() => THREE.Vector3[]) | null {
+  if (!r || watch.pov || !cur?.residents) return null;
+  return () => { const f = r.pos, e = cur!.residents!.sense(r).eye; return [new THREE.Vector3(f.x, f.y + 0.15, f.z), new THREE.Vector3((f.x + e.x) / 2, (f.y + e.y) / 2, (f.z + e.z) / 2), e]; };
+}
 function fleetCutNow(r: any, p: Pose) {
   fleet.bridge = null;
   startWatch(r);
   watch.ang = p.ang; watch.off = p.off; watch.el = p.el; watch.dist = p.dist;
   fleetPlace(p);
+  cur?.T.ghosts?.cut(camera.position, ghostAsk(r));   // (the plants in the new shot's way faint from its first frame)
 }
 function fleetCut(r: any) {
   if (!cur?.residents || !r) return;
@@ -258,6 +265,7 @@ function fleetCut(r: any) {
   // (far: up into the sky over the way, the way there made ready — the shore's plants packed round where it goes)
   fleet.bridge = { to: r, until: performance.now() + rr(3000, 5000), sky: skyPose(drone.pos, { x: p.x, y: p.y, z: p.z }, cur.T) };
   fleetPlace(fleet.bridge.sky);
+  cur.T.ghosts?.cut(camera.position, null);   // (from the sky, nothing is seen through)
   cur.shore?.repack?.(new THREE.Vector3(p.x, p.y, p.z));
   rehearsal?.event('cam-sky', `${DORON[watch.r.id] ?? '13'} → ${DORON[r.id] ?? '13'}`, true);
 }
@@ -3654,7 +3662,7 @@ function frameBody(ts: number) {
       // and open up the forest roof over it, so it can be seen from above
       const cut = U.uCut.value; if (watch.r && !watch.pov) cut.set(watch.r.pos.x, watch.r.pos.y, watch.r.pos.z, Math.max(9, watch.dist * 1.6)); else cut.w = 0; }
     // the plants in the way of the camera to it, each seen through as a whole (ocean/ghost.ts: viewer design D27, plan 1)
-    cur.T.ghosts?.update(camera.position, watch.r && !watch.pov && cur.residents ? () => { const f = watch.r.pos, e = cur!.residents!.sense(watch.r).eye; return [new THREE.Vector3(f.x, f.y + 0.15, f.z), new THREE.Vector3((f.x + e.x) / 2, (f.y + e.y) / 2, (f.z + e.z) / 2), e]; } : null, dt);
+    cur.T.ghosts?.update(camera.position, fleet.bridge ? null : ghostAsk(watch.r), dt);
     const fl = hyp(fwd.x, fwd.z) || 1, fx = fwd.x / fl, fz = fwd.z / fl;
     cur.residents?.focus(watch.r);
     cur.residents?.setStudyWeather(wx.cloud, wx.ok ? 'live' : 'simulation');

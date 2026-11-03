@@ -7,9 +7,13 @@
 //   F the sky between two places: high above the way, looking to where it goes
 //   G for two seconds after a cut, nothing is out of sight and there is no "behind the camera" to put one (eco/unseen.ts:
 //     unseen, behind), then as before
+//   H a cut is not faded into (#155's plants seen through, ocean/ghost.ts): from the first frame of the new shot, the plant
+//     in its way is faint and the one in the old shot's way solid again; cut to the sky, none faint
 // Usage: npx tsx --import ./scripts/node-assets.mjs scripts/fleet-check.ts
+import * as THREE from 'three';
 import { poseFor, sightOf, camFor, skyPose, OFF, LEAVES_MAX, type Solid } from '../src/live/fleet';
 import { unseen, behind, holdUnseen } from '../src/eco/unseen';
+import { makeGhosts, type GhostPlant } from '../src/ocean/ghost';
 
 let bad = 0;
 const want = (what: string, ok: boolean, got = '') => { if (!ok) bad++; console.log(`${what}: ${got} ${ok ? 'ok' : 'FAIL'}`); };
@@ -55,6 +59,20 @@ const dot = { id: 'dot', pos: { x: 0, y: 1, z: 0 }, head: 0, sp: { living: false
   (performance as any).now = real;
   want('G two seconds after a cut: nothing out of sight, nowhere behind the camera; then as before', before && !during && after && !!bBefore && bDuring === null && !!bAfter,
     `unseen ${before} → ${during} → ${after}; behind ${!!bBefore} → ${bDuring} → ${!!bAfter}`);
+}
+{ // H
+  // (one watched at the origin; a bush 2.5 m toward the camera on its -z side, another 2.5 m toward the one on its +x side)
+  const mesh = new THREE.InstancedMesh(new THREE.BufferGeometry(), new THREE.MeshBasicMaterial(), 2);
+  mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(6), 3);
+  const bush = (i: number, x: number, z: number): GhostPlant => ({ mesh, i, key: `b${i}`, x, z, y0: 0, y1: 3, r: 0.6, g: 0, t: 0 });
+  const a = bush(0, 0, -2.5), b = bush(1, 2.5, 0), G = makeGhosts(); G.setFixed([a, b]);
+  const pts = () => [new THREE.Vector3(0, 0.2, 0), new THREE.Vector3(0, 0.6, 0), new THREE.Vector3(0, 1, 0)];
+  const camA = new THREE.Vector3(0, 1.6, -5.5), camB = new THREE.Vector3(5.5, 1.6, 0), sky = new THREE.Vector3(0, 40, -20);
+  for (let k = 0; k < 40; k++) G.update(camA, pts, 0.05);
+  const onA = [a.g, b.g]; G.cut(camB, pts); const onB = [a.g, b.g]; G.cut(sky, null); const onSky = [a.g, b.g];
+  const col = mesh.instanceColor.array as Float32Array;
+  want('H a cut is not faded into: the new shot\'s plant faint at once, the old one solid; from the sky none', onA.join() === '1,0' && onB.join() === '0,1' && onSky.join() === '0,0' && col[0] === 0 && col[3] === 0,
+    `from A ${onA}; cut to B ${onB}; cut to the sky ${onSky}`);
 }
 console.log(bad ? `FAIL (${bad})` : 'all ok');
 process.exit(bad ? 1 : 0);
