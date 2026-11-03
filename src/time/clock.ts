@@ -121,6 +121,7 @@ export interface SkyState {
   day: number;        // 0..1 how much daylight (for diurnal animals)
   twilight: number;   // 0..1 peaks around sunrise and sunset (crepuscular animals)
   month: number; mday: number;   // local calendar date, for seasonal visitors
+  ms: number;                     // the moment this is the sky of (for what keeps the real calendar: the reef's spawning night)
 }
 
 /** The sea's season (month) and the real day (mday) its day's draws go by — a manta's day, the day's lot of fish, each
@@ -192,7 +193,7 @@ export function skyState(ms: number, site: SiteLike): SkyState {
     day: smooth(-0.05, 0.25, sa),
     // the season what comes by goes by (the whales' months, a manta's months) and the real day its day's draws go by.
     // Dot's world: the island's month — its day, light and dark, keeps the real clock (ADR 0006/0007; science on #166, #212)
-    ...seasonDate(ms, site),
+    ...seasonDate(ms, site), ms,
     twilight: Math.exp(-(((s.alt * 180 / Math.PI) - 1) ** 2) / (2 * 7 * 7)),
   };
 }
