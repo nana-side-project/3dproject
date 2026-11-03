@@ -24,6 +24,16 @@
 //   - on long work by a place: the place and the one at work in turn, 35 seconds each (30–40 s)
 //   - when all are at rest: the residents awake and the places in turn, 75 seconds each (60–90 s)
 // never from one place's camera straight to another's.
+// The day's timed sights (TRIAL6.md §1-2, sights.ts): one on a camera of its own — the dawn and the sunset on the beach's
+// (07) or from above the island (13), the island round from above — is rank 4, as the sea's shows, but gone to in its
+// time over anything below rank 2 (a line being said let finish, ten seconds at most), and only ranks 1 and 2 cut in on
+// it. One cut in on is gone back to while its time lasts; the island round, the camera's alone, is then over for the day.
+// The round keeps its three minutes; the dawn and the sunset their time. Then the next, as after one at rest. One starting
+// to think, or on its way to ask, give or tell (not yet talking), neither keeps a sight waiting nor cuts in on it: what
+// "このあと" promised comes at its time (viewer design on #243). How each ended — its time done, cut in on (by what), or
+// never on air in its time — is told for the trial's log.
+import type { SightId } from './sights';
+
 const ORDER = ['dot', 'rakko', 'kame', 'lantern'];
 const TURN_S = 75, P1_HOLD = 20, REST_MAX = 12, WORK_TURN = 180, LINE_WAIT = 10;
 const PLACE_HOLD = 12, OPEN_HOLD = 8, OPEN_GAP = 180, HERE_M = 12, ALT_S = 35;
@@ -46,7 +56,16 @@ export interface DirectorCtx {
   visible?(r: any): boolean;   // (its camera sees it: fleet.ts — none given, all are)
   skip?(who: string, pri: number, why: string): void;   // (passed over, its camera not seeing it: for the log)
   places?(): { subj: { id: string; place: string; no: string }; at: { lx: number; lz: number } }[];   // (the fixed cameras there now)
+  sight?(): { id: SightId; key: string; subj: any } | null;   // (a camera's timed sight in its time now, and the camera for it: sights.ts, main.ts)
+  sightEnd?(id: string, how: 'done' | 'cut' | 'missed', why: string): void;   // (how a sight ended: for the trial's log)
 }
+const SIGHT_PRI = 4, ROUND_S = 180;
+/** What a timed sight neither waits for nor is cut in on (viewer design on #243): one starting to think, one on its way to
+ *  ask, give or tell — not yet talking. A real rank 1 (a moment decided, a result, a first) and a talk or a gathering
+ *  cut in on it as ever. */
+const soft = (kind: string) => kind === 'thinking' || TALK.has(kind);
+/** A camera's own subject — a place's (06–09) or the sky's (13) — not a resident. */
+const camera = (r: any) => !!(r?.place || r?.sky);
 const SKIP_EVERY = 60, HIDDEN_LEAVE = 3;
 
 export const awake = (r: any) => r.act !== 'sleep' && r.task?.kind !== 'sleep' && !(r.task?.kind === 'voyage' && r.task.data?.started);   // (asleep, or away at sea: not followed)
@@ -80,6 +99,15 @@ export function makeDirector(ctx: DirectorCtx) {
     return false;
   };
   let hiddenFor = 0;
+  // (the timed sight on air, or last on air before what cut in on it; those over for the day; a line waited for)
+  let sightShot: null | { id: SightId; key: string; subj: any; at: number } = null, sightWait = 0, dueKey = '';
+  const over = new Set<string>(), aired = new Set<string>();
+  function sightGo(s: { id: SightId; key: string; subj: any }, why: string) {
+    if (ctx.watched() !== s.subj) ctx.watch(s.subj);
+    ctx.cam?.(s.subj.id, SIGHT_PRI, 'sight', why);
+    sightShot = { ...s, at: clock }; aired.add(s.key);
+    shot = { id: s.subj.id, pri: SIGHT_PRI, kind: 'sight', since: clock, scene: clock, hold: 0, after: null }; turn = TURN_S;
+  }
   function next(R: any) {
     // (the residents awake with the places between them — never from a place straight to a place)
     const now = ctx.watched(), res: any[] = ORDER.map((id) => R.list.find((x: any) => x.id === id)).filter((r: any) => r && awake(r)), pl = places().map((p) => p.subj), seq: any[] = [];
@@ -111,16 +139,33 @@ export function makeDirector(ctx: DirectorCtx) {
     const r = ctx.watched();
     if (!r) { const n = next(R); if (n) { const k = rank(R, n); follow(n, k.pri, k.kind, 'start'); } return; }
     // (the one on air, its camera not seeing it a while: as if at rest, so another that can be seen is gone to)
-    hiddenFor = !r.place && ctx.visible && !ctx.visible(r) ? hiddenFor + 0.5 : 0;
-    if (shot.id !== r.id) { shot = { id: r.id, pri: r.place ? 6 : rank(R, r).pri, kind: r.place ? 'place' : rank(R, r).kind, since: clock, scene: clock, hold: 0, after: null }; turn = TURN_S; }   // (followed by another hand: its turn begins now)
+    hiddenFor = !camera(r) && ctx.visible && !ctx.visible(r) ? hiddenFor + 0.5 : 0;
+    if (shot.id !== r.id) { shot = { id: r.id, pri: camera(r) ? 6 : rank(R, r).pri, kind: r.place ? 'place' : r.sky ? 'sky' : rank(R, r).kind, since: clock, scene: clock, hold: 0, after: null }; turn = TURN_S; }   // (followed by another hand: its turn begins now)
+    // (a timed sight on air, its time over — the round's three minutes, the dawn's or the sunset's window: the next, as
+    // after one at rest; cut in on: the round over for the day, the dawn and the sunset gone back to while they last)
+    const s = ctx.sight?.() ?? null; if (!s) sightWait = 0;
+    // (a sight's time gone by with it never on air: told)
+    if (dueKey && dueKey !== s?.key) { if (!aired.has(dueKey)) ctx.sightEnd?.(dueKey.split(':')[0], 'missed', '時刻のうちに出なかった'); dueKey = ''; }
+    if (s && !aired.has(s.key) && !over.has(s.key)) dueKey = s.key;
+    const onSight = !!sightShot && shot.kind === 'sight' && r === sightShot.subj;
+    if (onSight) {
+      const ss = sightShot!;
+      if (ss.id === 'round' ? clock - ss.at >= ROUND_S : s?.key !== ss.key) {
+        over.add(ss.key); sightShot = null; ctx.sightEnd?.(ss.id, 'done', ss.id === 'round' ? '3分見せた' : '時刻が終わった');
+        const nx = next(R), n = nx && nx !== r ? nx : R.list.find((x: any) => x.id === 'dot');   // (none else awake: back to Dot, as at night)
+        if (n) { const k = camera(n) ? { pri: 6, kind: 'place' } : rank(R, n); follow(n, k.pri, k.kind, '見どころの終わり', false); }
+        return;
+      }
+    } else if (sightShot) { ctx.sightEnd?.(sightShot.id, 'cut', shot.kind); if (sightShot.id === 'round') over.add(sightShot.key); sightShot = null; }
+    const sightDue = !!s && !onSight && !over.has(s.key), softHold = sightDue && soft(shot.kind);
     // (a place on air: while its time lasts, only what outranks it cuts in; after it, the one it was about, else as one at rest)
-    const placeHeld = !!r.place && shot.hold > clock, held = !r.place && shot.hold > clock;
-    if (r.place && !placeHeld && shot.after) { const a = shot.after; shot.after = null; follow(a.n, a.pri, a.kind, a.why, false, a.scene); return; }
-    const cur = held ? { pri: 1, kind: shot.kind } : r.place ? { pri: placeHeld ? shot.pri : 6, kind: 'place' } : rank(R, r);
+    const placeHeld = !!r.place && !onSight && shot.hold > clock, held = !camera(r) && shot.hold > clock;
+    if (r.place && !onSight && !placeHeld && shot.after) { const a = shot.after; shot.after = null; follow(a.n, a.pri, a.kind, a.why, false, a.scene); return; }
+    const cur = onSight ? { pri: SIGHT_PRI, kind: 'sight' } : held ? { pri: 1, kind: shot.kind } : camera(r) ? { pri: placeHeld ? shot.pri : 6, kind: r.place ? 'place' : 'sky' } : rank(R, r);
     // (rank 1: what has just happened, or one starting to think — the line being said let finish, ten seconds at most)
     while (calls.length && clock - calls[0].at > 30) calls.shift();
     const live = R.list.filter((x: any) => awake(x));
-    const thinking = live.find((x: any) => x !== r && x.task?.kind === 'ponder'), hauling = live.find((x: any) => x !== r && x.task?.kind === 'haul' && x.task.data?.quick);
+    const thinking = onSight || sightDue ? undefined : live.find((x: any) => x !== r && x.task?.kind === 'ponder'), hauling = live.find((x: any) => x !== r && x.task?.kind === 'haul' && x.task.data?.quick);
     const c = calls.find((x) => x.id !== r.id || !held);
     const p1 = c ? { r: R.list.find((x: any) => x.id === c.id), kind: c.kind, why: c.why, call: c } : thinking ? { r: thinking, kind: 'thinking', why: '考え始めた', call: null }
       : hauling ? { r: hauling, kind: 'storm', why: '台風が来て、急いで筏を引き上げている', call: null } : null;
@@ -128,7 +173,7 @@ export function makeDirector(ctx: DirectorCtx) {
       if (!ctx.speaking() || (p1.call ? clock - p1.call.at : 0) > LINE_WAIT) {
         if (p1.call) calls.splice(calls.indexOf(p1.call), 1);
         // (a first at a place: its card's eight seconds on the place's camera, then the one whose first it is — not from another place's)
-        const at = p1.call?.kind === 'first' && p1.call.place && !r.place ? places().find((p) => p.subj.id === p1.call!.place) : null;
+        const at = p1.call?.kind === 'first' && p1.call.place && (!r.place || onSight) ? places().find((p) => p.subj.id === p1.call!.place) : null;
         if (at) placeThen(at, p1.r, 1, p1.kind, `初めて：${p1.why}`, OPEN_HOLD); else follow(p1.r, 1, p1.kind, p1.why);
         return;
       }
@@ -140,11 +185,18 @@ export function makeDirector(ctx: DirectorCtx) {
       if (at) { placeThen(at, r, 1, p1.kind, `初めて：${p1.why}`, OPEN_HOLD); return; }
       shot.hold = clock + P1_HOLD; shot.kind = p1.kind; shot.pri = 1; ctx.cam?.(r.id, 1, p1.kind, p1.why); return;
     }
-    if (held || (placeHeld && shot.pri <= 2)) return;
+    if (!softHold && (held || (placeHeld && shot.pri <= 2))) return;
     // (a gathering — the fire's, the morning's: the house's wide shot while it lasts, the ring's heads in it — MULTICAM.md §2-1, BUBBLE.md §10)
     const gather = live.find((x: any) => rank(R, x).kind === 'fire'), home = gather ? places().find((p) => p.subj.id === 'house') : null;
-    if (home && (r === home.subj ? !placeHeld : !r.place && (cur.pri > 2 || cur.kind === 'fire'))) { follow(home.subj, 2, 'gather', '集まり'); return; }
-    if (cur.pri > 2) { const t = live.find((x: any) => x !== r && rank(R, x).pri === 2 && can(x, 2)); if (t) { const k = rank(R, t); follow(t, 2, k.kind, k.kind === 'talk' ? '話している' : k.kind === 'fire' ? '焚き火の会' : '頼み・知らせ'); return; } }
+    if (home && (r === home.subj ? !placeHeld : (!r.place || onSight) && (cur.pri > 2 || cur.kind === 'fire'))) { follow(home.subj, 2, 'gather', '集まり'); return; }
+    if (cur.pri > 2 || (sightDue && soft(cur.kind))) { const t = live.find((x: any) => x !== r && rank(R, x).pri === 2 && (!(onSight || sightDue) || !soft(rank(R, x).kind)) && can(x, 2)); if (t) { const k = rank(R, t); follow(t, 2, k.kind, k.kind === 'talk' ? '話している' : k.kind === 'fire' ? '焚き火の会' : '頼み・知らせ'); return; } }
+    // (a timed sight in its time, not on: gone to over anything below rank 2, and over one starting to think or on its way
+    // to ask — a line being said let finish, ten seconds at most; on: only a real rank 1, a talk or a gathering cut in, above)
+    if (sightDue && (cur.pri > 2 || soft(cur.kind))) {
+      if (ctx.speaking() && clock - (sightWait || (sightWait = clock)) < LINE_WAIT) return;
+      sightWait = 0; sightGo(s, `定時の見どころ：${s.id}`); return;
+    }
+    if (onSight) return;
     // (long work by a place: the place's camera and the one at work in turn, 35 s each — the scene's three minutes kept)
     if (!r.place && cur.pri === 3 && clock - shot.since >= ALT_S) { const p = placeNear(r); if (p) { placeThen(p, r, 3, cur.kind, '仕事の場所', ALT_S, shot.scene); return; } }
     // (at rest: twelve seconds, if another has something going on; at work: three minutes — one trying a goal of its own first)
@@ -173,5 +225,11 @@ export function makeDirector(ctx: DirectorCtx) {
     },
     /** A try's result, from the trials' screen (PROGRAM.md §1): rank 1. */
     trial(r: any, outcome: string, text: string) { call(r, `result:${outcome}`, text); },
+    /** The timed sight on air now (its id and its key for the day), if any. */
+    sightOn: () => (sightShot && shot.kind === 'sight' && ctx.watched() === sightShot.subj ? { id: sightShot.id, key: sightShot.key } : null),
+    /** Whether a sight is over for the day (its time done on air, or the round cut in on). */
+    sightOver: (key: string) => over.has(key),
+    /** Whether a sight has been on air (いま from then on, "このあと": viewer design on #243). */
+    sightAired: (key: string) => aired.has(key),
   };
 }

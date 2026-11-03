@@ -87,12 +87,12 @@ if (cams.length) {
   };
   const byPri = {}, lastAt = ticks.at(-1) ?? ms(cams.at(-1));
   cams.forEach((c, i) => { const end = i + 1 < cams.length ? ms(cams[i + 1]) : lastAt; byPri[c.pri] = (byPri[c.pri] ?? 0) + until(ms(c), end); });
-  const total = Object.values(byPri).reduce((a, b) => a + b, 0) || 1, NAME = { 1: '1 decided/result/first', 2: '2 together/talking', 3: '3 work', 4: '4 sea', 5: '5 looking back', 6: '6 at rest' };
+  const total = Object.values(byPri).reduce((a, b) => a + b, 0) || 1, NAME = { 1: '1 decided/result/first', 2: '2 together/talking', 3: '3 work', 4: '4 sea/timed sights', 5: '5 looking back', 6: '6 at rest' };
   console.log(`the drone (cam rows ${cams.length}): ${Object.keys(byPri).sort().map((p) => `${NAME[p] ?? p} ${(byPri[p] / 60e3).toFixed(1)} min (${Math.round(byPri[p] / total * 100)}%)`).join(', ')}`);
   // (the drone fleet, ADR 0010 / MULTICAM.md §5: a shot is a cam row with another one than the row before it. Each camera's
   // time, the shots an hour, a shot's length on average by day (6–21 h) and by night, the ones passed over for not being
   // seen (cam-skip rows: written once a minute at most for each), and the cuts through the sky (cam-sky rows))
-  const DORON = { dot: '01', rakko: '02', kame: '03', lantern: '04', house: '06', beach: '07', fire: '08', field: '09' }, shots = cams.filter((c, i) => i === 0 || c.who !== cams[i - 1].who);
+  const DORON = { dot: '01', rakko: '02', kame: '03', lantern: '04', house: '06', beach: '07', fire: '08', field: '09', sky: '13' }, shots = cams.filter((c, i) => i === 0 || c.who !== cams[i - 1].who);
   const byCam = {}, lens = { day: [], night: [] };
   shots.forEach((c, i) => { const end = i + 1 < shots.length ? ms(shots[i + 1]) : lastAt, len = until(ms(c), end), k = `${DORON[c.who] ?? '13'} ${c.who}`; byCam[k] = (byCam[k] ?? 0) + len; const h = new Date(ms(c) + 9 * 3600e3).getUTCHours(); (h >= 6 && h < 21 ? lens.day : lens.night).push(len); });
   const camTotal = Object.values(byCam).reduce((a, b) => a + b, 0) || 1, hours = until(ms(cams[0]), lastAt) / 3600e3 || 1, avg = (a) => (a.length ? `${(a.reduce((x, y) => x + y, 0) / a.length / 1e3).toFixed(0)} s (${a.length})` : '—');
@@ -102,6 +102,15 @@ if (cams.length) {
   const says = rows.filter((r) => r.t === 'event' && r.kind === 'say').map((r) => String(r.text)), subWhy = {};
   for (const t of says.filter((t) => t.startsWith('sub '))) { const w = t.split(' ').slice(2).join(' ') || '—'; subWhy[w] = (subWhy[w] ?? 0) + 1; }
   if (says.length) console.log(`the lines said: ${says.length}; as bubbles ${says.filter((t) => t.startsWith('bubble ')).length} (${Math.round(says.filter((t) => t.startsWith('bubble ')).length / says.length * 100)}%); the subtitle ${Object.entries(subWhy).map(([w, n]) => `${w} ${n}`).join(', ') || 0}`);
+  // (the day's timed sights on a camera of their own, TRIAL6.md §1: each time one went on air — a second time is one gone
+  // back to after what cut in on it — and on which camera)
+  const sightOn = cams.filter((c) => c.kind === 'sight'), sightK = {};
+  for (const c of sightOn) { const k = `${String(c.why).split('：')[1] ?? '?'} ${DORON[c.who] ?? '13'}`; sightK[k] = (sightK[k] ?? 0) + 1; }
+  if (sightOn.length) console.log(`the timed sights on air: ${sightOn.length} — ${Object.entries(sightK).map(([k, n]) => `${k} ×${n}`).join(', ')}`);
+  // (how each ended — its time done, cut in on and by what, never on air in its time: viewer design on #243)
+  const ends = rows.filter((r) => r.t === 'event' && r.kind === 'sight-end').map((r) => String(r.text)), endK = {};
+  for (const t of ends) endK[t] = (endK[t] ?? 0) + 1;
+  if (ends.length) console.log(`the timed sights ended: ${Object.entries(endK).map(([k, n]) => `${k} ×${n}`).join(', ')}`);
   console.log(`the cameras: ${Object.keys(byCam).sort().map((k) => `${k} ${(byCam[k] / 60e3).toFixed(1)} min (${Math.round(byCam[k] / camTotal * 100)}%)`).join(', ')}`);
   console.log(`  shots ${shots.length}, ${(shots.length / hours).toFixed(1)} an hour; a shot on average: day ${avg(lens.day)}, night ${avg(lens.night)}; through the sky ${skies}; to another side, hidden ${sides}; passed over, not seen ${skips} (${Math.round(skips / Math.max(1, skips + shots.length) * 100)}% of the choices)`);
   const results = rows.filter((r) => r.t === 'trial' && r.kind === 'result' && r.result !== 'steps-done');   // (§7-2: steps-done is not counted)
