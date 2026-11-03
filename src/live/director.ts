@@ -16,8 +16,22 @@
 // on; on work three minutes, then the next one at work — one trying a goal of its own first. When all are at rest, each one
 // awake in turn for six minutes, as before. Every change of whom it follows, and of the rank of the one followed, is told
 // to cam() (the trial's log).
+// The fixed cameras (stage 2, MULTICAM.md §1–2 and §2-1; src/live/fixed.ts): a place's camera is chosen
+//   - for a first of the island's at a place: its card's eight seconds on the place, then the one whose first it is (a
+//     change with no card — a piece put on — is as work, rank 3: below)
+//   - for a gathering (the fire's, the morning's): the house's wide shot, as long as it lasts
+//   - at a scene's beginning: going to one at work or talking by a place from elsewhere, eight seconds of the place first
+//   - on long work by a place: the place and the one at work in turn, 35 seconds each (30–40 s)
+//   - when all are at rest: the residents awake and the places in turn, 75 seconds each (60–90 s)
+// never from one place's camera straight to another's.
 const ORDER = ['dot', 'rakko', 'kame', 'lantern'];
-const TURN_S = 360, P1_HOLD = 20, REST_MAX = 12, WORK_TURN = 180, LINE_WAIT = 10;
+const TURN_S = 75, P1_HOLD = 20, REST_MAX = 12, WORK_TURN = 180, LINE_WAIT = 10;
+const PLACE_HOLD = 12, OPEN_HOLD = 8, OPEN_GAP = 180, HERE_M = 12, ALT_S = 35;
+/** Which place's camera shows each first's card (by the first's key — world/milestones.ts — not the event's kind; viewer
+ *  design on #241): what stands at the house or is made at its shelf → 06; the raft's → 07; the pots fired → 08. The rest
+ *  (the clay pit, the sail woven and the mast cut elsewhere, the crossings, the fibre and the rope) have none. */
+const FIRST_PLACE: Record<string, string> = { hut: 'house', 'house-roof': 'house', 'house-walls': 'house', house: 'house', wall: 'house', light: 'house',
+  'cook-pot': 'house', retort: 'house', 'weather-pot': 'house', raft: 'beach', rig: 'beach', lash: 'beach', 'fired-pot': 'fire' };
 const REST = new Set(['sleep', 'charge', 'rest', 'nap', 'float', 'idle', 'study-rest', 'study-pause', 'bask', 'groom', 'look', 'wander', 'shelter']);
 const TALK = new Set(['ask', 'give', 'tell', 'say', 'answer']);
 // (the world's events that are rank 1: a first; in its own mind, a goal set or a try's end; a crossing)
@@ -31,6 +45,7 @@ export interface DirectorCtx {
   cam?(who: string, pri: number, kind: string, why: string): void;
   visible?(r: any): boolean;   // (its camera sees it: fleet.ts — none given, all are)
   skip?(who: string, pri: number, why: string): void;   // (passed over, its camera not seeing it: for the log)
+  places?(): { subj: { id: string; place: string; no: string }; at: { lx: number; lz: number } }[];   // (the fixed cameras there now)
 }
 const SKIP_EVERY = 60, HIDDEN_LEAVE = 3;
 
@@ -49,9 +64,13 @@ export function rank(R: any, r: any): { pri: number; kind: string } {
 
 export function makeDirector(ctx: DirectorCtx) {
   // (its own reckoning: who it is on, why and since when; rank-1 moments waiting their turn)
-  let shot = { id: '', pri: 6, kind: '', since: 0, hold: 0 }, clock = 0, turn = 0, dirT = 0;
-  const calls: { id: string; kind: string; why: string; at: number }[] = [];
-  const call = (r: any, kind: string, why: string) => { if (r?.id && ORDER.includes(r.id)) { calls.push({ id: r.id, kind, why: why.slice(0, 80), at: clock }); if (calls.length > 12) calls.shift(); } };
+  let shot = { id: '', pri: 6, kind: '', since: 0, scene: 0, hold: 0, after: null as null | { n: any; pri: number; kind: string; why: string; scene: number } }, clock = 0, turn = 0, dirT = 0;
+  // (the places: when each was last on, what has happened at each)
+  const placeAt: Record<string, number> = {};
+  const places = () => ctx.places?.() ?? [];
+  const placeNear = (r: any) => (r?.pos ? places().find((p) => Math.hypot(r.pos.x - p.at.lx, r.pos.z - p.at.lz) <= HERE_M) ?? null : null);
+  const calls: { id: string; kind: string; why: string; at: number; place?: string }[] = [];
+  const call = (r: any, kind: string, why: string, place?: string) => { if (r?.id && ORDER.includes(r.id)) { calls.push({ id: r.id, kind, why: why.slice(0, 80), at: clock, place }); if (calls.length > 12) calls.shift(); } };
   const ownGoal = (R: any, r: any) => { const g = R.mind?.(r)?.goal; return !!g && g.by !== 'habit'; };
   // (its camera sees it; one passed over for not being seen, told now and then)
   const skipped: Record<string, number> = {};
@@ -62,23 +81,42 @@ export function makeDirector(ctx: DirectorCtx) {
   };
   let hiddenFor = 0;
   function next(R: any) {
-    const now = ctx.watched(), i = now ? ORDER.indexOf(now.id) : -1;
-    for (let k = 1; k <= ORDER.length; k++) { const r = R.list.find((x: any) => x.id === ORDER[(i + k) % ORDER.length]); if (r && awake(r) && (r === now || can(r))) return r; }
+    // (the residents awake with the places between them — never from a place straight to a place)
+    const now = ctx.watched(), res: any[] = ORDER.map((id) => R.list.find((x: any) => x.id === id)).filter((r: any) => r && awake(r)), pl = places().map((p) => p.subj), seq: any[] = [];
+    for (let k = 0; k < Math.max(res.length, pl.length); k++) { if (res[k]) seq.push(res[k]); if (pl[k]) seq.push(pl[k]); }
+    const i = now ? seq.findIndex((x) => x.id === now.id) : -1;
+    for (let k = 1; k <= seq.length; k++) { const r = seq[(i + k) % seq.length]; if (r && (r.place ? !now?.place : r === now || can(r))) return r; }
     return now ?? R.list.find((x: any) => x.id === 'dot');
   }
-  function follow(n: any, pri: number, kind: string, why: string) {
+  /** A place's camera on air for a while, then the one it is about (the opening of a scene, a first's card, long work). */
+  function placeThen(p: { subj: any }, n: any, pri: number, kind: string, why: string, hold: number, scene = clock) {
+    placeAt[p.subj.id] = clock;
+    if (ctx.watched() !== p.subj) ctx.watch(p.subj);
+    ctx.cam?.(p.subj.id, pri, 'place', why);
+    shot = { id: p.subj.id, pri, kind: 'place', since: clock, scene, hold: clock + hold, after: { n, pri, kind, why, scene } }; turn = TURN_S;
+  }
+  function follow(n: any, pri: number, kind: string, why: string, open = true, scene = clock) {
     const was = ctx.watched();
+    // (one at a gathering — the fire's, the morning's: the house's wide shot instead, the ring's heads in it)
+    if (!n.place && kind === 'fire') { const home = places().find((p) => p.subj.id === 'house'); if (home) { n = home.subj; kind = 'gather'; why = '集まり'; } }
+    // (a scene at a place, come to from elsewhere — not from another place's camera: the place first, then the one there)
+    const p = open && !n.place && pri > 1 && !was?.place ? placeNear(n) : null;
+    if (p && !(was && placeNear(was)?.subj.id === p.subj.id) && clock - (placeAt[p.subj.id] ?? -1e9) >= OPEN_GAP) { placeThen(p, n, pri, kind, `場所から：${why}`, OPEN_HOLD); return; }
     if (n !== was) ctx.watch(n);
     if (n !== was || shot.id !== n.id) ctx.cam?.(n.id, pri, kind, why);
-    shot = { id: n.id, pri, kind, since: clock, hold: pri === 1 ? clock + P1_HOLD : 0 }; turn = TURN_S;
+    if (n.place) placeAt[n.id] = clock;
+    shot = { id: n.id, pri, kind, since: clock, scene, hold: pri === 1 ? clock + P1_HOLD : n.place && (kind === 'place' || kind === 'gather') ? clock + PLACE_HOLD : 0, after: null }; turn = TURN_S;
   }
   function direct(R: any) {
     const r = ctx.watched();
     if (!r) { const n = next(R); if (n) { const k = rank(R, n); follow(n, k.pri, k.kind, 'start'); } return; }
     // (the one on air, its camera not seeing it a while: as if at rest, so another that can be seen is gone to)
-    hiddenFor = ctx.visible && !ctx.visible(r) ? hiddenFor + 0.5 : 0;
-    if (shot.id !== r.id) shot = { id: r.id, pri: rank(R, r).pri, kind: rank(R, r).kind, since: clock, hold: 0 };   // (followed by another hand)
-    const held = shot.hold > clock, cur = held ? { pri: 1, kind: shot.kind } : rank(R, r);
+    hiddenFor = !r.place && ctx.visible && !ctx.visible(r) ? hiddenFor + 0.5 : 0;
+    if (shot.id !== r.id) { shot = { id: r.id, pri: r.place ? 6 : rank(R, r).pri, kind: r.place ? 'place' : rank(R, r).kind, since: clock, scene: clock, hold: 0, after: null }; turn = TURN_S; }   // (followed by another hand: its turn begins now)
+    // (a place on air: while its time lasts, only what outranks it cuts in; after it, the one it was about, else as one at rest)
+    const placeHeld = !!r.place && shot.hold > clock, held = !r.place && shot.hold > clock;
+    if (r.place && !placeHeld && shot.after) { const a = shot.after; shot.after = null; follow(a.n, a.pri, a.kind, a.why, false, a.scene); return; }
+    const cur = held ? { pri: 1, kind: shot.kind } : r.place ? { pri: placeHeld ? shot.pri : 6, kind: 'place' } : rank(R, r);
     // (rank 1: what has just happened, or one starting to think — the line being said let finish, ten seconds at most)
     while (calls.length && clock - calls[0].at > 30) calls.shift();
     const live = R.list.filter((x: any) => awake(x));
@@ -87,29 +125,48 @@ export function makeDirector(ctx: DirectorCtx) {
     const p1 = c ? { r: R.list.find((x: any) => x.id === c.id), kind: c.kind, why: c.why, call: c } : thinking ? { r: thinking, kind: 'thinking', why: '考え始めた', call: null }
       : hauling ? { r: hauling, kind: 'storm', why: '台風が来て、急いで筏を引き上げている', call: null } : null;
     if (p1?.r && p1.r !== r && awake(p1.r) && cur.pri > 1 && can(p1.r, 1)) {
-      if (!ctx.speaking() || (p1.call ? clock - p1.call.at : 0) > LINE_WAIT) { if (p1.call) calls.splice(calls.indexOf(p1.call), 1); follow(p1.r, 1, p1.kind, p1.why); return; }
+      if (!ctx.speaking() || (p1.call ? clock - p1.call.at : 0) > LINE_WAIT) {
+        if (p1.call) calls.splice(calls.indexOf(p1.call), 1);
+        // (a first at a place: its card's eight seconds on the place's camera, then the one whose first it is — not from another place's)
+        const at = p1.call?.kind === 'first' && p1.call.place && !r.place ? places().find((p) => p.subj.id === p1.call!.place) : null;
+        if (at) placeThen(at, p1.r, 1, p1.kind, `初めて：${p1.why}`, OPEN_HOLD); else follow(p1.r, 1, p1.kind, p1.why);
+        return;
+      }
       return;   // (waiting for the line to end)
     }
-    if (p1?.r === r && p1.call) { calls.splice(calls.indexOf(p1.call), 1); shot.hold = clock + P1_HOLD; shot.kind = p1.kind; shot.pri = 1; ctx.cam?.(r.id, 1, p1.kind, p1.why); return; }   // (on it already: it stays)
-    if (held) return;
-    // (rank 2 cuts in on 3 and 6: two at work together, talking, at the fire)
+    if (p1?.r === r && p1.call) {   // (on it already: it stays — a first at a place, its card's eight seconds on the place first)
+      calls.splice(calls.indexOf(p1.call), 1);
+      const at = p1.call.kind === 'first' && p1.call.place ? places().find((p) => p.subj.id === p1.call!.place) : null;
+      if (at) { placeThen(at, r, 1, p1.kind, `初めて：${p1.why}`, OPEN_HOLD); return; }
+      shot.hold = clock + P1_HOLD; shot.kind = p1.kind; shot.pri = 1; ctx.cam?.(r.id, 1, p1.kind, p1.why); return;
+    }
+    if (held || (placeHeld && shot.pri <= 2)) return;
+    // (a gathering — the fire's, the morning's: the house's wide shot while it lasts, the ring's heads in it — MULTICAM.md §2-1, BUBBLE.md §10)
+    const gather = live.find((x: any) => rank(R, x).kind === 'fire'), home = gather ? places().find((p) => p.subj.id === 'house') : null;
+    if (home && (r === home.subj ? !placeHeld : !r.place && (cur.pri > 2 || cur.kind === 'fire'))) { follow(home.subj, 2, 'gather', '集まり'); return; }
     if (cur.pri > 2) { const t = live.find((x: any) => x !== r && rank(R, x).pri === 2 && can(x, 2)); if (t) { const k = rank(R, t); follow(t, 2, k.kind, k.kind === 'talk' ? '話している' : k.kind === 'fire' ? '焚き火の会' : '頼み・知らせ'); return; } }
+    // (long work by a place: the place's camera and the one at work in turn, 35 s each — the scene's three minutes kept)
+    if (!r.place && cur.pri === 3 && clock - shot.since >= ALT_S) { const p = placeNear(r); if (p) { placeThen(p, r, 3, cur.kind, '仕事の場所', ALT_S, shot.scene); return; } }
     // (at rest: twelve seconds, if another has something going on; at work: three minutes — one trying a goal of its own first)
-    const best = () => live.filter((x: any) => x !== r && rank(R, x).pri <= 3 && can(x)).sort((a: any, b: any) => rank(R, a).pri - rank(R, b).pri || Number(ownGoal(R, b)) - Number(ownGoal(R, a)))[0];
-    if ((cur.pri === 6 && clock - shot.since >= REST_MAX) || (cur.pri === 3 && clock - shot.since >= WORK_TURN) || hiddenFor >= HIDDEN_LEAVE) {
+    // (on a place's camera in turn with one at work: not that one again)
+    const best = () => live.filter((x: any) => x !== r && x !== shot.after?.n && rank(R, x).pri <= 3 && can(x)).sort((a: any, b: any) => rank(R, a).pri - rank(R, b).pri || Number(ownGoal(R, b)) - Number(ownGoal(R, a)))[0];
+    if ((cur.pri === 6 && clock - shot.since >= REST_MAX) || (cur.pri === 3 && clock - shot.scene >= WORK_TURN) || hiddenFor >= HIDDEN_LEAVE) {
       const b = best(); if (b) { const k = rank(R, b); follow(b, k.pri, k.kind, hiddenFor >= HIDDEN_LEAVE ? '見えなくなった' : ownGoal(R, b) ? '試みの途中' : '仕事の途中'); hiddenFor = 0; return; }
     }
     if (cur.pri !== shot.pri) ctx.cam?.(r.id, cur.pri, cur.kind, '同じ住人の、していることが変わった');   // (the same one, its rank changed: for the time each rank is on screen)
     if (cur.pri !== shot.pri || cur.kind !== shot.kind) { shot.pri = cur.pri; shot.kind = cur.kind; }
     // (all at rest, or the one followed gone to sleep: as before, the next one awake)
-    if (turn <= 0 || (!awake(r) && turn < TURN_S - 30)) { const n = next(R); if (n && n !== r) { const k = rank(R, n); follow(n, k.pri, k.kind, awake(r) ? 'じゅんばん' : '眠った'); } else turn = TURN_S; }
+    if ((turn <= 0 && cur.pri >= 6) || (!r.place && !awake(r) && turn < TURN_S - 30)) {
+      const n = next(R);
+      if (n && n !== r) { const k = n.place ? { pri: 6, kind: 'place' } : rank(R, n); follow(n, k.pri, k.kind, r.place || awake(r) ? 'じゅんばん' : '眠った', false); } else turn = TURN_S;
+    }
   }
   return {
     /** Each frame: the drone's reckoning, twice a second. */
     tick(dt: number) { const R = ctx.residents(); if (!R) return; turn -= dt; clock += dt; if ((dirT -= dt) <= 0) { dirT = 0.5; direct(R); } },
     /** What the world tells (residents' onEvent), ranked. */
     event(kind: string, text: string, r: any, meta?: { milestone?: string }) {
-      if (meta?.milestone) call(r, 'first', text);
+      if (meta?.milestone) call(r, 'first', text, FIRST_PLACE[meta.milestone]);
       else if (kind === 'mind' && MIND1.test(text)) call(r, /目的/.test(text.split('：')[1]) ? 'decided' : 'result', text);
       else if (kind === 'map' || kind === 'sail' || kind === 'raft') call(r, 'crossing', text);
       else if (kind === 'weather' && /長いうねりに気づいた/.test(text)) call(r, 'storm', text);
