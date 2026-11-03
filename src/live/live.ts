@@ -41,6 +41,8 @@ export interface LiveCtx {
   cue?(c: Cue): void;                // a notification sound (audio.ts cue; PROGRAM.md §5-3)
   speaking?(): boolean;              // a resident's voice sounding now (a notification sound waits for it to end)
   cueLog?(c: Cue, sounded: boolean, why: string): void;   // (each sounded or let go, for the log: ?rehearsal)
+  /** Each line said as it begins: as a bubble or the subtitle, and why the subtitle (for the log: BUBBLE.md §10). */
+  sayLog?(mode: 'bubble' | 'sub', who: string, why: string): void;
   /** Where r's head is on the screen (px; the point over it the bubble's tail points at), and — sight asked — whether
    *  the camera on air sees it (BUBBLE.md §3). */
   headAt?(r: any, sight?: boolean): { x: number; y: number; front: boolean; on: boolean; seen: boolean } | null;
@@ -193,14 +195,16 @@ export function makeLive(ctx: LiveCtx) {
   }
   /** As a line begins: a bubble, if the head is in the picture and in sight, the line short enough, and room for it. */
   function decide(sp: any, key: string): 'bubble' | 'sub' {
-    if (!ctx.headAt || ctx.bridging?.()) return 'sub';   // (the sky between two places: the subtitle, as on #228)
+    const sub = (why: string) => { ctx.sayLog?.('sub', sp.id, why); return 'sub' as const; };
+    if (!ctx.headAt) return 'sub';
+    if (ctx.bridging?.()) return sub('空のつなぎ');   // (the sky between two places: the subtitle, as on #228)
     const lines = bubbleLines(en ? sp.sayEn ?? '' : sp.saying, en ? 'en' : 'ja'), hp = ctx.headAt(sp);
     const b = bubs.find((x) => !x.key);
-    if (!lines || !hp?.on || !hp.seen || !b) return 'sub';
+    if (!lines) return sub('長い'); if (!hp?.front || !hp.on) return sub('画面の外'); if (!hp.seen) return sub('隠れている'); if (!b) return sub('吹き出しが足りない');
     fillBub(b, sp, key, lines);
     const others = bubs.filter((x) => x !== b && x.key && x.place && !x.el.classList.contains('off')).map((x) => x.place!);
-    if (drawBub(b, 0, others) || (b.place = null, drawBub(b, 0, []))) { b.el.classList.remove('off'); b.tail.classList.remove('off'); return 'bubble'; }
-    b.key = ''; b.who = null; return 'sub';
+    if (drawBub(b, 0, others) || (b.place = null, drawBub(b, 0, []))) { b.el.classList.remove('off'); b.tail.classList.remove('off'); ctx.sayLog?.('bubble', sp.id, ''); return 'bubble'; }
+    b.key = ''; b.who = null; return sub('置き場所がない');
   }
   let speakerNow: any = null, talking = false, capKey = '';
   const talk = makeTalk((line) => decide(speakerNow, line.key));
@@ -397,5 +401,5 @@ export function makeLive(ctx: LiveCtx) {
 
   /** A try's result, for the trials' screen (PROGRAM.md §1): the drone goes to the one whose try it was (rank 1). */
   const trial = (r: any, outcome: string, text: string) => director.trial(r, outcome, text);
-  return { update: (dt: number) => { update(dt); cardTick(dt); cueTick(); }, sample, haze, event, trial };
+  return { update: (dt: number) => { update(dt); cardTick(dt); cueTick(); }, sample, haze, event, trial, talking: () => talking };
 }

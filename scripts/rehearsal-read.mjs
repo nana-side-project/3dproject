@@ -1,6 +1,7 @@
 // Reads a rehearsal log (src/ui/rehearsal-log.ts, ?rehearsal) and says how much of it had something worth watching
 // (docs/rehearsal/CYCLES.md). Minute by minute, on the time in Japan:
-//   strong  a subtitle (sub), a milestone card (card) put up on the live screen, or a trial's result with words to show
+//   strong  a line said put up — a subtitle (sub), or a speech bubble (say rows, bubble: BUBBLE.md §10) — a milestone card
+//           (card) put up on the live screen, or a trial's result with words to show
 //           (not steps-done, its steps taken with nothing to check: not a result for PROGRAM.md §7-2)
 //   weak    the status line changed (status)
 // and the residents' trials (trial rows: begun, with words fit to show, and how they came out)
@@ -18,7 +19,7 @@ if (!file) { console.error('usage: node scripts/rehearsal-read.mjs <rehearsal-�
 const rows = readFileSync(file, 'utf8').split('\n').filter(Boolean).flatMap((l) => { try { return [JSON.parse(l)]; } catch { return []; } });
 const minOf = (r) => r.jst.slice(0, 16);   // (YYYY-MM-DDTHH:MM, in Japan)
 const step = (m) => new Date(Date.parse(m + ':00+09:00') + 60e3 + 9 * 3600e3).toISOString().slice(0, 16);
-const alive = new Set(), strong = new Set(), weak = new Set(), n = { sub: 0, card: 0, shown: 0, status: 0, blank: 0, hidden: 0, error: 0 };
+const alive = new Set(), strong = new Set(), weak = new Set(), n = { sub: 0, bubble: 0, card: 0, shown: 0, status: 0, blank: 0, hidden: 0, error: 0 };
 const trials = { start: 0, shown: 0, result: {}, blank: 0 }, sound = {}, cues = { sounded: {}, letGo: {}, hours: {} }, ai = { calls: 0, ok: 0, why: {}, models: {} }, slow = { n: 0, hidden: 0, parts: {} };
 let first = '', last = '';
 for (const r of rows) {
@@ -26,6 +27,7 @@ for (const r of rows) {
   const m = minOf(r);
   if (!first || m < first) first = m; if (m > last) last = m; alive.add(m);   // (a minute the app ran in: it writes a row each second)
   if (r.t === 'sub') { n.sub++; strong.add(m); }
+  else if (r.t === 'event' && r.kind === 'say' && String(r.text).startsWith('bubble ')) { n.bubble++; strong.add(m); }   // (a line as a bubble: put up as a subtitle is)
   else if (r.t === 'card') { n.card++; strong.add(m); }
   else if (r.t === 'event' && r.kind === 'cue') {   // (the notification sounds, PROGRAM.md §5-3: each sounded, or let go and why)
     const [c, why] = String(r.text).split('（鳴らさず：'); const k = r.shown ? 'sounded' : 'letGo', w = r.shown ? c : (why ?? '').replace(/）$/, '');
@@ -54,10 +56,10 @@ let prev = '';
 for (const m of mins) { if (prev && step(prev) !== m) run = 0; prev = m; if (strong.has(m)) run = 0; else if (++run > best) { best = run; bestAt = m; } }
 const bestFrom = mins[mins.indexOf(bestAt) - best + 1];
 console.log(`${file}: ${first.replace('T', ' ')} – ${last.replace('T', ' ')} (JST), ${mins.length} minutes running${span > mins.length ? ` (${span - mins.length} with nothing written: not running)` : ''}`);
-console.log(`minutes with a strong one (subtitle, card, trial result): ${pct(mins.filter((m) => strong.has(m)).length, mins.length)}`);
+console.log(`minutes with a strong one (a line said, card, trial result): ${pct(mins.filter((m) => strong.has(m)).length, mins.length)}`);
 console.log(`minutes with either (or the status line changing):      ${pct(mins.filter((m) => strong.has(m) || weak.has(m)).length, mins.length)}`);
 console.log(`longest run with no strong one: ${best} min${best ? ` (${bestFrom.slice(11)}–${bestAt.slice(11)})` : ''}`);
-console.log(`counts: subtitles ${n.sub}, cards ${n.card}, status changes ${n.status} (to blank ${n.blank}); the day's log (not on the live screen) ${n.shown}; tab hidden ${n.hidden}, errors ${n.error}`);
+console.log(`counts: subtitles ${n.sub}, bubbles ${n.bubble}, cards ${n.card}, status changes ${n.status} (to blank ${n.blank}); the day's log (not on the live screen) ${n.shown}; tab hidden ${n.hidden}, errors ${n.error}`);
 console.log(`sound (a row a minute): ${Object.keys(sound).length ? Object.entries(sound).map(([k, v]) => `${k} ${v} min`).join(', ') : 'not written (a log from before it was)'}`);
 { const sum = (o) => Object.values(o).reduce((a, b) => a + b, 0), list = (o) => Object.entries(o).map(([k, v]) => `${k} ${v}`).join(', '), most = Math.max(0, ...Object.values(cues.hours));
   console.log(`notification sounds: sounded ${sum(cues.sounded)}${sum(cues.sounded) ? ` (${list(cues.sounded)})` : ''}; let go ${sum(cues.letGo)}${sum(cues.letGo) ? ` (${list(cues.letGo)})` : ''}; most in an hour, the cards' aside: ${most}`); }
@@ -96,6 +98,10 @@ if (cams.length) {
   const camTotal = Object.values(byCam).reduce((a, b) => a + b, 0) || 1, hours = until(ms(cams[0]), lastAt) / 3600e3 || 1, avg = (a) => (a.length ? `${(a.reduce((x, y) => x + y, 0) / a.length / 1e3).toFixed(0)} s (${a.length})` : '—');
   const skips = rows.filter((r) => r.t === 'event' && r.kind === 'cam-skip').length, skies = rows.filter((r) => r.t === 'event' && r.kind === 'cam-sky' && !String(r.text).startsWith('→')).length;
   const sides = rows.filter((r) => r.t === 'event' && r.kind === 'cam-side').length;   // (cut to another side of the one on air, hidden from where it was)
+  // (the lines said: as bubbles, or the subtitle and why — BUBBLE.md §10)
+  const says = rows.filter((r) => r.t === 'event' && r.kind === 'say').map((r) => String(r.text)), subWhy = {};
+  for (const t of says.filter((t) => t.startsWith('sub '))) { const w = t.split(' ').slice(2).join(' ') || '—'; subWhy[w] = (subWhy[w] ?? 0) + 1; }
+  if (says.length) console.log(`the lines said: ${says.length}; as bubbles ${says.filter((t) => t.startsWith('bubble ')).length} (${Math.round(says.filter((t) => t.startsWith('bubble ')).length / says.length * 100)}%); the subtitle ${Object.entries(subWhy).map(([w, n]) => `${w} ${n}`).join(', ') || 0}`);
   console.log(`the cameras: ${Object.keys(byCam).sort().map((k) => `${k} ${(byCam[k] / 60e3).toFixed(1)} min (${Math.round(byCam[k] / camTotal * 100)}%)`).join(', ')}`);
   console.log(`  shots ${shots.length}, ${(shots.length / hours).toFixed(1)} an hour; a shot on average: day ${avg(lens.day)}, night ${avg(lens.night)}; through the sky ${skies}; to another side, hidden ${sides}; passed over, not seen ${skips} (${Math.round(skips / Math.max(1, skips + shots.length) * 100)}% of the choices)`);
   const results = rows.filter((r) => r.t === 'trial' && r.kind === 'result' && r.result !== 'steps-done');   // (§7-2: steps-done is not counted)
