@@ -1977,14 +1977,15 @@ export function makeResidents(loc: any, T: any, fishNames: string[], birdNames: 
       if (!r.holding && village.wall.pile > 0) o.push({ id: 'wallfetch:beach', action: 'wallfetch', label: `浜の石置き場から石を取ってくる（いま${village.wall.pile}個）`, targetId: 'stones' });
     }
     // (to burn: when the pots or the oil want wood — an オオハマボウ, felled for its branches)
-    // (driftwood in hand: the tree is offered all the same, the driftwood set down beside the bench first — held, no tree
-    // was offered and the island stopped short of firewood for days: rand 2, science on #221, 11/3; anything else in hand,
-    // the tree for firewood is shown, not ready, and why: ADR 0004)
+    // (driftwood in hand: the tree for firewood, when it is wanted, is offered all the same, the driftwood set down beside the
+    // bench first — held, no tree was offered and the island stopped short of firewood for days: rand 2, science on #221,
+    // 11/3; anything else in hand, it is shown, not ready, and why: ADR 0004. The trees felled to open land wait for empty
+    // hands as before: offered with driftwood in hand too, a mind choosing at random felled some eighty more in 300 hours)
     const axeHands = r.holding === 'wood' ? '。手の流木は、先に作業台の脇に置く' : '', freeForAxe = !r.holding || r.holding === 'wood';
     if (r.id === 'dot' && r.stats.built >= HUT.length && woodWanted()) { const t = fuelTree(r); if (t) o.push({ id: `fuel:${t.x.toFixed(2)},${t.z.toFixed(2)}`, action: 'fuel', label: `薪にするため、林の${KIND_JA[t.kind]}を切り倒す（高さ約${Math.round(t.h)}m、${Math.round(t.d)}m先。枝が薪になり、切った株からまた芽が出る${axeHands}）`, targetId: 'tree', ...(freeForAxe ? {} : { ready: false, needs: `手があいていること（いま${HELD_JA[r.holding] ?? r.holding}を持っている）` }) }); }
-    if (r.id === 'dot' && r.stats.built >= HUT.length && freeForAxe) for (const t of fellable(r)) {
+    if (r.id === 'dot' && r.stats.built >= HUT.length && !r.holding) for (const t of fellable(r)) {
       const ww = windward(t.x, t.z);
-      o.push({ id: `fell:${t.x.toFixed(2)},${t.z.toFixed(2)}`, action: 'fell', label: `林の木を切り倒す（${KIND_JA[t.kind] ?? '木'}、高さ約${Math.round(t.h)}m、${Math.round(t.d)}m先。丸太${t.h > 7 ? 3 : 2}本と薪、切った所は開けた土地になる${ww ? '。家の風上（南東）の木：防風林が薄くなる' : ''}${axeHands}）`, targetId: `forest:${t.x.toFixed(1)},${t.z.toFixed(1)}` });
+      o.push({ id: `fell:${t.x.toFixed(2)},${t.z.toFixed(2)}`, action: 'fell', label: `林の木を切り倒す（${KIND_JA[t.kind] ?? '木'}、高さ約${Math.round(t.h)}m、${Math.round(t.d)}m先。丸太${t.h > 7 ? 3 : 2}本と薪、切った所は開けた土地になる${ww ? '。家の風上（南東）の木：防風林が薄くなる' : ''}）`, targetId: `forest:${t.x.toFixed(1)},${t.z.toFixed(1)}` });
     }
     // (the coconut husk: every hand action its materials and places allow, set among the rest at a place the island,
     // the one deciding and the moment choose — not after the steps of a recipe)
@@ -2017,8 +2018,8 @@ export function makeResidents(loc: any, T: any, fishNames: string[], birdNames: 
     else if (action === 'ledge') t = ledgeTask(r);
     else if (action === 'stonedrop') t = dropTask(r);
     else if (action === 'fell' || action === 'fuel') {
-      const [x, z] = target.split(',').map(Number); t = !r.holding || r.holding === 'wood' ? fellTask(x, z) : null; if (t && action === 'fuel') t.data.fuel = 1;
-      if (t && r.holding === 'wood') t = task('woodstow', benchStand(), 'pick', 3, { data: { then: t } });   // (driftwood in hand: by the bench first, then to the tree)
+      const [x, z] = target.split(',').map(Number); t = !r.holding || (r.holding === 'wood' && action === 'fuel') ? fellTask(x, z) : null; if (t && action === 'fuel') t.data.fuel = 1;
+      if (t && r.holding === 'wood') t = task('woodstow', benchStand(), 'pick', 3, { data: { then: t } });   // (driftwood in hand, the tree for firewood: by the bench first, then to the tree)
     }
     else if (action === 'woodtake') t = !r.holding && village.benchWood > 0 ? task('woodtake', benchStand(), 'pick', 3) : null;
     else if (action === 'twist') t = task('twist', benchStand(), 'work', rr(60, 90));

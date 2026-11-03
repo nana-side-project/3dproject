@@ -1,7 +1,7 @@
 // Headless check (science on #221, 11/3 — the rand 2 island stopped with driftwood in Dot's hands: no tree was offered):
 // on the real island of Dot's world, the hut and the raft done, two dry pots waiting and no firewood, a mind of its own:
-//  A driftwood in hand: the tree for firewood is offered all the same (said: the driftwood set down by the bench first),
-//    and the trees to fell
+//  A driftwood in hand: the tree for firewood is offered all the same (said: the driftwood set down by the bench first);
+//    the trees felled to open land wait for empty hands, as before
 //  B chosen: Dot walks to the bench and sets the driftwood down — it lies there, seen (not a bare count) — the diary says
 //    so, and on to the tree, the same step: felled, and the step's result says what was done
 //  C its hands free and the driftwood by the bench: a step to take it up again; taken, it is in hand and gone from there
@@ -44,8 +44,9 @@ const benchWoodSeen = () => R.benchWoodDrawn() as number;   // (the logs drawn b
 { // A
   dot.holding = 'wood'; dot.task = null;
   const o = opts(), fuel = o.find((x) => x.id.startsWith('fuel:')), fell = o.filter((x) => x.id.startsWith('fell:'));
-  want('A driftwood in hand: the tree for firewood offered, said to be set down first; trees to fell', !!fuel && fuel.ready !== false && /手の流木は、先に作業台の脇に置く/.test(fuel.label) && fell.length > 0 && fell.every((x) => /手の流木は、先に作業台の脇に置く/.test(x.label)),
-    `${fuel ? `${fuel.id} ready ${fuel.ready !== false}` : 'no fuel step'}; ${fell.length} to fell`);
+  dot.holding = ''; const free = opts().filter((x) => x.id.startsWith('fell:')).length; dot.holding = 'wood';
+  want('A driftwood in hand: the tree for firewood offered, said to be set down first; no trees to fell till the hands are free', !!fuel && fuel.ready !== false && /手の流木は、先に作業台の脇に置く/.test(fuel.label) && fell.length === 0 && free > 0,
+    `${fuel ? `${fuel.id} ready ${fuel.ready !== false}` : 'no fuel step'}; ${fell.length} to fell with it in hand, ${free} with the hands free`);
 }
 { // B
   asked = 'fuel:';
