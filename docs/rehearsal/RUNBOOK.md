@@ -64,8 +64,14 @@ AI が止まっても、島が台詞とルールで続くこと（エラーに�
 4. `seaglassRehearsal.clear()` で記録を消す。
 
 ## 5. 始める（10/31 8:00 ごろ）
-1. 新しい島で始める場合は、開発者ツールの Application → Local Storage → `http://localhost:4173` で、`seaglass.aikey` 以外の `seaglass.` のキーを消す（キーは残す）。
-2. `http://localhost:4173/?live&rehearsal` を開き、コンソールで `seaglassRehearsal.clear()`。
+1. 新しい島で始める場合（6 回目・7 回目・12 月。D36・D37・D40）：
+   1. いまの島を書き出す：`http://localhost:4173/?live&rehearsal` を開き、コンソールで `seaglassRehearsal.saveOut()`。届いた `save-*.json` を、公開しない記録として保管する（D37・D40）。
+   2. `http://localhost:4173/?live&rehearsal&newisland=今日の日付`（日本時間、例：`newisland=2026-11-12`）を開く。住人の保存が片づき、島の暦がいまから**島暦 1 年 6 月 1 日**で始まる。
+      - 日付が今日でなければ、何もしない（古いリンクを開き直して島を消さないため）。
+      - 開いたあと、アドレスから `newisland` は消える。読み直しても新しい島のまま続く。
+      - API キー（`seaglass.aikey`）・音量などの設定は残る。
+   3. 画面右上の日付が「島暦1年 6月1日」で、左上が第 1 章の 1 日目になっていることを確かめる。
+2. `seaglassRehearsal.clear()` で記録を消し、ページを 1 度読み直す（記録の頭に、島の暦の始まりの `island-epoch` の行が書かれる）。
 3. 始める前の保存を書き出す：`seaglassRehearsal.saveOut()`（API キーは入らない）。ダウンロードの表示が配信に映らないよう、**配信を始める前に**行う。
 4. 配信と、配信 PC での録画を始める。
 
@@ -80,4 +86,4 @@ AI が止まっても、島が台詞とルールで続くこと（エラーに�
 4. 記録・始めと終わりの保存・配信 PC の録画の場所を、科学班と視聴者設計班に渡す。
 
 ## 記録の行（`rehearsal-*.ndjson`）
-どの行にも `jst`（日本時間）・`isl`（画面の島の時計）・`world`（世界の時計）。`sec`（毎秒のフレーム）、`slow`（250 ms を超えたフレームと内訳）、`event`（出来事、`shown`）、`ai`（頭の呼び出し、本文なし）、`status`（状態の文）、`card`（節目の札）、`sub`（字幕）、`sea`（5 分ごとの海面）。
+どの行にも `jst`（日本時間）・`isl`（画面の島の時計）・`world`（世界の時計）。`sec`（毎秒のフレーム）、`slow`（250 ms を超えたフレームと内訳）、`event`（出来事、`shown`）、`ai`（頭の呼び出し、本文なし）、`status`（状態の文）、`card`（節目の札）、`sub`（字幕）、`sea`（5 分ごとの海面）。`event` の `island-epoch` は、その島の暦の始まり（ページを開くたびに 1 行）。

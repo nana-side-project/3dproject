@@ -7,6 +7,9 @@
 //    a manta's months — and the sea's warmth go by the island's month in Dot's world, the day's draws (a manta's day, the
 //    day's lot of fish) by the real day: the island's month as at that real day's noon, the real day's date — a manta's
 //    day never changes within a real day, and comes about as often as its month says. The Earth's seas keep the Earth's
+//  6 a new island's calendar (本体 11/2: each new island begins its own): set at its start, it begins on island June 1st
+//    of year 1, its weather the record's as the first island's was, as long after its start; kept with the island's save
+//    and given back on loading it; an island saved before islands had their own keeps the first one's
 // Usage: npx tsx --import ./scripts/node-assets.mjs scripts/island-time-check.ts
 import * as THREE from 'three';
 import { makeResidents } from '../src/robots/residents';
@@ -15,7 +18,7 @@ import { mulberry32 } from '../src/core/math';
 import { skyState, seaTemp } from '../src/time/clock';
 import { DOTWORLD, LOCATIONS } from '../src/data/locations';
 import { mantaDay } from '../src/eco/events';
-import { ISLAND_RATE, islandDate, islandWait, islandWeather, loadIslandWeather, type IslandWeather } from '../src/world/island-time';
+import { ISLAND_EPOCH, islandEpoch, setIslandEpoch, ISLAND_RATE, islandDate, islandWait, islandWeather, loadIslandWeather, type IslandWeather } from '../src/world/island-time';
 
 let bad = 0;
 const want = (what: string, ok: boolean, got = '') => { if (!ok) bad++; console.log(`${what}: ${got} ${ok ? 'ok' : 'FAIL'}`); };
@@ -103,6 +106,26 @@ let typhoonAt = 0;
   let warm = t0, hi = -1; for (let t = t0; t < t0 + 28 * 24 * H; t += H) { const c = seaTemp(t, DOTWORLD.lat, DOTWORLD.tempYear!, DOTWORLD.world); if (c > hi) { hi = c; warm = t; } }
   const w = islandDate(warm);
   want('5 the sea is warmest in the island\'s late August', w.month === 8 && w.day >= 15, `${w.label} ${hi.toFixed(1)}°C`);
+}
+{ // 6 a new island's calendar
+  const tN = Date.parse('2026-11-12T00:00:00+09:00');
+  setIslandEpoch(tN);
+  const a = islandDate(tN), y = islandDate(tN + 28 * 24 * H), w0 = islandWeather(tN)!;
+  let firstN = 0; for (let m = 0; m < 28 * 24 * 60 && !firstN; m += 10) if (islandWeather(tN + m * 60e3)!.typhoon) firstN = tN + m * 60e3;
+  want('6 a new island: island June 1st of year 1 at its start, a year four real weeks on; the record\'s weather as the first island\'s, as long after its start',
+    a.year === 1 && a.month === 6 && a.day === 1 && y.year === 2 && y.month === 6 && /^2024-06-01T00:00/.test(w0.record.at) && firstN - tN === typhoonAt - t0, `${a.label}; ${y.label}; first typhoon ${((firstN - tN) / 864e5).toFixed(2)} real days in (the first island's ${((typhoonAt - t0) / 864e5).toFixed(2)})`);
+  const store = new Map<string, string>();
+  Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => store.set(k, v), removeItem: (k: string) => store.delete(k) } });
+  const f = () => 2, T: any = { ground: f, floor: f, top: f, landCover: () => ({ can: 0, sand: 1 }), vegH: () => 0, solids: new Solids() };
+  const make = () => { const R: any = makeResidents({ id: 'kayama', lat: 24.37, lon: 124.03, f } as any, T, ['テスト魚'], ['テスト鳥']); R.setBrain(null); return R; };
+  make().save();
+  const saved = JSON.parse(store.get('seaglass.residents.v1')!).islandEpoch;
+  setIslandEpoch(ISLAND_EPOCH); make();
+  const back = islandEpoch();
+  const old = JSON.parse(store.get('seaglass.residents.v1')!); delete old.islandEpoch; store.set('seaglass.residents.v1', JSON.stringify(old));
+  setIslandEpoch(tN); make();
+  want('6 kept with the island\'s save, given back on loading it; an older save keeps the first island\'s', saved === tN && back === tN && islandEpoch() === ISLAND_EPOCH, `saved ${saved === tN}, loaded ${back === tN}, older ${islandEpoch() === ISLAND_EPOCH}`);
+  setIslandEpoch(ISLAND_EPOCH);
 }
 console.log(bad ? `FAIL (${bad})` : 'PASS');
 process.exit(bad ? 1 : 0);

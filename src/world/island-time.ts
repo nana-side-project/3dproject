@@ -8,10 +8,24 @@ import type { Weather } from '../time/weather';
 
 /** How much faster the island's calendar (and what is only waited for) runs than the real clock. */
 export const ISLAND_RATE = 365 / 28;
-/** The real moment the island's calendar began, and the day of its year it began on (island June 1st: the typhoon
- *  season is days away, not weeks). */
+/** The real moment the first island's calendar began (the trial island's: an island saved without a start of its own
+ *  keeps it), and the day of its year an island's calendar begins on (island June 1st: the typhoon season is days away,
+ *  not weeks). */
 export const ISLAND_EPOCH = Date.parse('2026-10-05T00:00:00+09:00');
-const EPOCH = ISLAND_EPOCH, EPOCH_DAY = 151;
+const EPOCH_DAY = 151, EPOCH_KEY = 'seaglass.islandEpoch';
+// Each new island begins its own calendar, on island June 1st of its year 1 (本体 2026-11-02: the trials on a new island
+// and December's begin alike, the season not hanging on the day it starts). This island's start: kept with its save
+// (robots/residents.ts) and, to have it before the island is loaded, on its own in this browser. The processes' island
+// clock (world/process-runner.ts) keeps ISLAND_EPOCH as its anchor: only a count of time, not a date.
+let epoch = (() => { try { const v = Number(localStorage.getItem(EPOCH_KEY)); return v > 0 ? v : ISLAND_EPOCH; } catch (e) { return ISLAND_EPOCH; } })();
+/** This island's calendar's start (real ms). */
+export const islandEpoch = () => epoch;
+/** Set this island's calendar's start (a new island: the moment it began; a loaded one: its own, or ISLAND_EPOCH). */
+export function setIslandEpoch(ms: number) {
+  if (!(ms > 0)) return;
+  epoch = ms;
+  try { localStorage.setItem(EPOCH_KEY, String(ms)); } catch (e) { /* its save keeps it as well */ }
+}
 const DAY = 86400000;
 const MONTH_DAYS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 
@@ -22,7 +36,7 @@ export type IslandSeason = '春' | '夏' | '秋' | '冬';
 export interface IslandDate { year: number; dayOfYear: number; month: number; day: number; season: IslandSeason; label: string }
 /** The island's date at a real moment. Its year is 365 days; island year 1 began on island June 1st. */
 export function islandDate(realMs: number): IslandDate {
-  const days = EPOCH_DAY + ((realMs - EPOCH) / DAY) * ISLAND_RATE;
+  const days = EPOCH_DAY + ((realMs - epoch) / DAY) * ISLAND_RATE;
   const year = Math.floor(days / 365) + 1, dayOfYear = ((Math.floor(days) % 365) + 365) % 365;
   let m = 0, d = dayOfYear; while (d >= MONTH_DAYS[m]) { d -= MONTH_DAYS[m]; m++; }
   const month = m + 1, season: IslandSeason = month >= 3 && month <= 5 ? '春' : month <= 8 && month >= 6 ? '夏' : month >= 9 && month <= 11 ? '秋' : '冬';

@@ -4,7 +4,7 @@
 // what they want to keep — then has Dot and Rakko each write the day's post from their own records and photographs.
 // Out: DATA/drafts/<day>-<who>.json (the posts), DATA/photos/<id>.json (the shots to draw: tools/journal/photos.cjs),
 // DATA/runs/<day>.json (what it cost and did), DATA/storage.json (the island, for tomorrow).
-// Usage: npx tsx --import ./scripts/node-assets.mjs scripts/journal-run.ts [--data DIR] [--day YYYY-MM-DD] [--dry]
+// Usage: npx tsx --import ./scripts/node-assets.mjs scripts/journal-run.ts [--data DIR] [--day YYYY-MM-DD] [--dry] [--new-island]
 //   ANTHROPIC_API_KEY in the environment: the residents think and write with the model; without it (or --dry) they
 //   live by habit and the posts are plain drafts (by: "draft", never published).
 import fs from 'node:fs';
@@ -51,7 +51,13 @@ Date.now = () => sim;
 const THREE = await import('three');
 const { loadLand } = await import('../src/ocean/land');
 const { DOTWORLD } = await import('../src/data/locations');
-const { islandDate, islandWeather, loadIslandWeather } = await import('../src/world/island-time');
+const { islandDate, islandWeather, loadIslandWeather, setIslandEpoch } = await import('../src/world/island-time');
+// (a new island, D36/D37: its calendar begins with its first day, on island June 1st of year 1 — --new-island, once, on a
+// store that holds no island; after that the store keeps its start: island-time.ts)
+if (process.argv.includes('--new-island')) {
+  if (store.has('seaglass.residents.v1')) { console.error('--new-island: the store still holds an island (put it away first)'); process.exit(1); }
+  setIslandEpoch(t0);
+}
 await loadIslandWeather();
 const loc: any = DOTWORLD;   // (Dot's world: the residents' island on the other planet — ADR 0007)
 await loadLand('kayama', loc.land.half, loc.land.far);

@@ -65,6 +65,7 @@ export interface Env {
   t: number;
   day: number; night: number; twilight: number; sunI: number;
   month: number; mday: number;
+  ms: number;                            // the moment the sky is of (the clock the sea is shown at)
   cur: { x: number; z: number };
   plankton: Plankton;
   threats: Threat[];                     // last frame's threats (read)

@@ -13,7 +13,7 @@
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { islandDate } from '../src/world/island-time';
+import { islandDate, setIslandEpoch, ISLAND_EPOCH } from '../src/world/island-time';
 
 const arg = (k: string, d?: string) => { const i = process.argv.indexOf(`--${k}`); return i > 0 && process.argv[i + 1] && !process.argv[i + 1].startsWith('--') ? process.argv[i + 1] : d; };
 const flag = (k: string) => process.argv.includes(`--${k}`);
@@ -101,6 +101,9 @@ const ass = (w: number, h: number, lines: { from: number; to: number; x: number;
 const commands: { cwd: string; args: string[] }[] = [], report: any[] = [];
 chosen.forEach((c, n) => {
   const base = `clip-${day(c.at)}-${n + 1}`, wr = [...rows].reverse().find((r) => r.world && T(r) <= c.at)?.world;
+  // (the island's own calendar, as the log says it was then: a log from before islands had their own, the first one's)
+  const ep = [...rows].reverse().find((r) => r.t === 'event' && r.kind === 'island-epoch' && T(r) <= c.at)?.text;
+  setIslandEpoch(ep ? Date.parse(String(ep).split(' ')[0]) : ISLAND_EPOCH);
   const d = wr ? islandDate(Date.parse(wr)) : null, date = d ? `島暦${d.year}年 ${d.month}月${d.day}日` : '';
   const ins = c.segs.flatMap((s) => ['-ss', sec(s.from), '-t', ((s.to - s.from) / 1000).toFixed(2), '-i', video ? resolve(video) : 'RECORDING']);
   const gap = c.segs.length > 1;
