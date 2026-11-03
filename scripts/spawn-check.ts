@@ -7,7 +7,7 @@
 // another evening at Kayama.
 // Usage: npx tsx --import ./scripts/node-assets.mjs scripts/spawn-check.ts   (env ISLAND_YEARS 600, EARTH_YEARS 80)
 import { spawnWindow, nightsFromFull as fromFull } from '../src/eco/spawn';
-import { islandDate, ISLAND_EPOCH } from '../src/world/island-time';
+import { islandDate, ISLAND_EPOCH, setIslandEpoch } from '../src/world/island-time';
 import { sunEvents } from '../src/time/clock';
 import { LOCATIONS, DOTWORLD } from '../src/data/locations';
 import { makeRareEvents } from '../src/eco/events';
@@ -38,6 +38,25 @@ const bad = (what: string) => { fail++; if (fail < 20) console.log('  ✗', what
   const share = byYear.size / years;
   if (share < 0.3 || share > 0.55) bad(`dot: ${(share * 100).toFixed(0)} % of island years`);
   console.log(`Dot's world: ${years} island years — a spawning night in ${byYear.size} (${(share * 100).toFixed(0)} %), longest real gap ${gap.toFixed(0)} days`);
+}
+// a new island (#225: its calendar begins afresh, on island June 1st, the moment it begins): the night follows its own
+// calendar — asked again the same evening once the start has changed, the answer is the new island's, not the old one's
+{
+  const listFrom = (start: number, n: number) => {
+    setIslandEpoch(start);
+    const out: string[] = [];
+    for (let d = start; out.length < n && d < start + 800 * DAY; d += DAY) {
+      const ev = sunEvents(d + 12 * HOUR, dot), mid = ev.set + 2.5 * HOUR;
+      if (spawnWindow(mid, dot)) out.push(new Date(mid + 9 * HOUR).toISOString().slice(0, 10));
+    }
+    return out;
+  };
+  const old = listFrom(ISLAND_EPOCH, 3), fresh = listFrom(Date.parse('2026-11-12T00:00:00+09:00'), 3);
+  // (and back: the same answers as before the change)
+  if (listFrom(ISLAND_EPOCH, 3).join() !== old.join()) bad('a new island: back on the first, its nights changed');
+  if (fresh[0] !== '2027-05-22') bad(`a new island begun 11/12 0:00: first night ${fresh[0]} (science: 2027-05-22)`);
+  setIslandEpoch(ISLAND_EPOCH);
+  console.log(`a new island: begun 10/5 — ${old.join(', ')}; begun 11/12 0:00 — ${fresh.join(', ')}`);
 }
 // the Earth
 {
