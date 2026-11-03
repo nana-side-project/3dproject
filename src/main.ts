@@ -83,16 +83,22 @@ const noPost = /[?&]nopost/.test(location.search), noPip = /[?&]nopip/.test(loca
 const live = /[?&]live\b/.test(location.search);
 // A new island (D36/D37: the trials on a new island and December's): ?newisland=<today's date, JST, YYYY-MM-DD> — before the
 // island is made, the one kept in this browser is put away (written out first by hand: seaglassRehearsal.saveOut(),
-// docs/rehearsal/RUNBOOK.md) and the island's calendar starts now, on island June 1st of year 1. Only on the day it names, so
-// an old link opened again does nothing; taken off the address once done, so a reload goes on with the new island.
+// docs/rehearsal/RUNBOOK.md) and the island's calendar starts now, on island June 1st of year 1. With a time,
+// ?newisland=YYYY-MM-DDTHH:MM[:SS] (JST), it starts at that time to the minute, opened in the two hours after it — trial 6,
+// trial 7 and December all at 08:00, so all three have the same weather in the same order (the record is read by the
+// island's date and the real hour: science on #225). Not earlier than five minutes before it (a clock a little slow), so
+// the island is never long on the day before its June 1st (science on #233). Only on the day it names, so an old link
+// opened again does nothing; taken off the address once done, so a reload goes on with the new island.
 const newIslandAt = (() => {
   const want = new URLSearchParams(location.search).get('newisland'), today = new Date(Date.now() + 9 * 3.6e6).toISOString().slice(0, 10);
   if (!want) return 0;
   const q = new URLSearchParams(location.search); q.delete('newisland');
   history.replaceState(null, '', `${location.pathname}${q.toString() ? `?${q.toString().replace(/=(&|$)/g, '$1')}` : ''}${location.hash}`);
-  if (want !== today) { console.warn(`newisland=${want}: not today (${today}) — nothing done`); return 0; }
+  const [day, time] = want.split('T'), at = time ? Date.parse(`${day}T${/^\d\d:\d\d$/.test(time) ? `${time}:00` : time}+09:00`) : Date.now();
+  if (day !== today) { console.warn(`newisland=${want}: not today (${today}) — nothing done`); return 0; }
+  if (!(at > 0) || Date.now() < at - 5 * 60e3 || Date.now() > at + 2 * 3.6e6) { console.warn(`newisland=${want}: open it in the two hours after that time (from five minutes before) — nothing done`); return 0; }
   try { localStorage.removeItem('seaglass.residents.v1'); } catch (e) { return 0; }
-  const at = Date.now(); setIslandEpoch(at); return at;
+  setIslandEpoch(at); return at;
 })();
 let liveUi: { update(dt: number): void; sample(canvas: HTMLCanvasElement): void; haze(): Record<string, number>; event(kind: string, text: string, r: any, meta?: { milestone?: string }): void } | null = null;
 const SAFE = (() => { try { return +(sessionStorage.getItem('seaglass.safe') || 0); } catch (e) { return 0; } })();
@@ -3647,6 +3653,8 @@ function frameBody(ts: number) {
       if (watch.r) { const wp = watch.r.pos; sp.x = wp.x; sp.y = wp.y; sp.z = wp.z; }
       // and open up the forest roof over it, so it can be seen from above
       const cut = U.uCut.value; if (watch.r && !watch.pov) cut.set(watch.r.pos.x, watch.r.pos.y, watch.r.pos.z, Math.max(9, watch.dist * 1.6)); else cut.w = 0; }
+    // the plants in the way of the camera to it, each seen through as a whole (ocean/ghost.ts: viewer design D27, plan 1)
+    cur.T.ghosts?.update(camera.position, watch.r && !watch.pov && cur.residents ? () => { const f = watch.r.pos, e = cur!.residents!.sense(watch.r).eye; return [new THREE.Vector3(f.x, f.y + 0.15, f.z), new THREE.Vector3((f.x + e.x) / 2, (f.y + e.y) / 2, (f.z + e.z) / 2), e]; } : null, dt);
     const fl = hyp(fwd.x, fwd.z) || 1, fx = fwd.x / fl, fz = fwd.z / fl;
     cur.residents?.focus(watch.r);
     cur.residents?.setStudyWeather(wx.cloud, wx.ok ? 'live' : 'simulation');
