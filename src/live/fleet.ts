@@ -67,6 +67,21 @@ export function sightOf(p: Pose, r: Who, T: Ground, solids?: SolidsLike | null):
   return leaves > LEAVES_MAX ? { seen: false, leaves, why: 'leaves' } : { seen: true, leaves, why: '' };
 }
 
+/** Whether the line from a to b is clear of the ground and of what cannot be gone through (solids.ts) — looked along each
+ *  0.5 m, the last 0.4 m by b not looked at. Leaves do not count (the plants in the way are seen through, #155): for the
+ *  speech bubble, whether the speaker's head is in sight (BUBBLE.md §3). */
+export function lineClear(a: { x: number; y: number; z: number }, b: { x: number; y: number; z: number }, T: Ground, solids?: SolidsLike | null): boolean {
+  const L = Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z), n = Math.max(1, Math.floor((L - 0.4) / STEP));
+  for (let k = 1; k <= n; k++) {
+    const f = (k * STEP) / L, x = a.x + (b.x - a.x) * f, y = a.y + (b.y - a.y) * f, z = a.z + (b.z - a.z) * f;
+    if (y < T.h(x, z) - 0.05) return false;
+    let hit = false;
+    solids?.each(x, z, 0.1, (s) => { if (!hit && y > s.y0 && y < s.y1 && Math.hypot(s.x - x, s.z - z) < s.r) hit = true; });
+    if (hit) return false;
+  }
+  return true;
+}
+
 /** The camera for r: the side it stands on now if it sees from there, else the first side in turn that does; null when
  *  none does (hidden: not chosen). */
 export function camFor(r: Who, T: Ground, solids?: SolidsLike | null, now = OFF): { pose: Pose; sight: Sight } | null {

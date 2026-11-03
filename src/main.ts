@@ -7,7 +7,8 @@ import './styles.css';
 import { U, mat } from './render/common';
 import { cloudAt } from './render/cloud';
 import { clamp, smooth, angDiff, rr, getStream, setStream, hyp } from './core/math';
-import { camFor, poseFor, sightOf, skyPose, NEAR_M, OFF as CAM_OFF, DORON, type Pose } from './live/fleet';
+import { camFor, poseFor, sightOf, skyPose, lineClear, headOf, NEAR_M, OFF as CAM_OFF, DORON, type Pose } from './live/fleet';
+import { HEAD_TOP, OVER_HEAD } from './live/bubble';
 import { holdUnseen } from './eco/unseen';
 import { LOCATIONS, DOTWORLD, type Sea } from './data/locations';
 import { worldKey, seaHash, seaForHash, migrateSeen } from './world/location-id';
@@ -100,7 +101,7 @@ const newIslandAt = (() => {
   try { localStorage.removeItem('seaglass.residents.v1'); } catch (e) { return 0; }
   setIslandEpoch(at); return at;
 })();
-let liveUi: { update(dt: number): void; sample(canvas: HTMLCanvasElement): void; haze(): Record<string, number>; event(kind: string, text: string, r: any, meta?: { milestone?: string }): void } | null = null;
+let liveUi: { update(dt: number): void; sample(canvas: HTMLCanvasElement): void; haze(): Record<string, number>; event(kind: string, text: string, r: any, meta?: { milestone?: string }): void; talking?(): boolean } | null = null;
 const SAFE = (() => { try { return +(sessionStorage.getItem('seaglass.safe') || 0); } catch (e) { return 0; } })();
 let lostCount = 0;
 canvas.addEventListener('webglcontextlost', (e) => {
@@ -282,7 +283,7 @@ function fleetOnAir(now: number) {
   const here: Pose = { x: c.x, y: c.y, z: c.z, ang: watch.ang, off: watch.off, el: watch.el, dist: watch.dist, lx: r.pos.x, ly: mid, lz: r.pos.z };
   if (sightOf(here, r, cur.T, cur.T.solids).seen) { onAir.hiddenSince = 0; return; }
   if (!onAir.hiddenSince) { onAir.hiddenSince = now; return; }
-  if (now - onAir.hiddenSince < 3000) return;
+  if (now - onAir.hiddenSince < 3000 || liveUi?.talking?.()) return;   // (a line being said: the cut waits for its end — BUBBLE.md §10)
   onAir.hiddenSince = 0;
   const side = fleetCam(r);
   if (side) { fleetCutNow(r, side.pose); rehearsal?.event('cam-side', `${DORON[r.id] ?? '13'} ${r.id}`, true); }
@@ -3878,7 +3879,22 @@ requestAnimationFrame(frame);
 if (live && (!location.hash || location.hash === '#')) history.replaceState(null, '', location.pathname + location.search + '#planet');   // (the stream is the island)
 if (live) import('./live/live').then((m) => { liveUi = m.makeLive({ residents: () => (mode === 'ocean' ? cur?.residents ?? null : null), watched: () => fleet.bridge?.to ?? watch.r, watch: (r) => fleetCut(r), clockMs: () => clock.ms, tz: () => cur?.loc.tz ?? 9, cam: (who, pri, kind, why) => rehearsal?.cam(who, pri, kind, why),
   visible: (r) => fleetSees(r), skip: (who, pri, why) => rehearsal?.event('cam-skip', `${DORON[who] ?? '13'} ${who} ${why}`, false), bridging: () => !!fleet.bridge,
-  cue: (c) => cue(c), speaking: () => speaking(), cueLog: (c, sounded, why) => rehearsal?.event('cue', sounded ? c : `${c}（鳴らさず：${why}）`, sounded) }); });
+  cue: (c) => cue(c), speaking: () => speaking(), cueLog: (c, sounded, why) => rehearsal?.event('cue', sounded ? c : `${c}（鳴らさず：${why}）`, sounded),
+  headAt: (r, sight) => headAt(r, sight), sayLog: (mode, who, why) => rehearsal?.event('say', `${mode} ${who}${why ? ` ${why}` : ''}`, false) }); });
+// Where a resident's head is on the screen, for the speech bubble (BUBBLE.md §2–3; src/live/bubble.ts): the point 12 cm
+// over the top of its head, as the camera on air draws it — in front of the camera or not, on the screen or not, and
+// (when asked) whether the line to it is clear of the ground and of rocks, trunks, posts (fleet.ts lineClear; the plants
+// in the way are seen through). Only read: nothing of it reaches a resident.
+const _head = new THREE.Vector3();
+function headAt(r: any, sight = true) {
+  if (!cur?.T || !r?.pos) return null;
+  _head.set(r.pos.x, r.pos.y + (HEAD_TOP[r.id] ?? headOf(r) + 0.15) + OVER_HEAD, r.pos.z);
+  const at = { x: _head.x, y: _head.y, z: _head.z };
+  _head.project(camera);
+  const W = innerWidth, H = innerHeight, x = ((_head.x + 1) / 2) * W, y = ((1 - _head.y) / 2) * H, front = _head.z < 1;
+  const on = front && x >= 0 && x <= W && y >= 0 && y <= H;
+  return { x, y, front, on, seen: on && sight && lineClear(camera.position, at, cur.T, cur.T.solids) };
+}
 const start = seaForHash(location.hash, LOCATIONS, DOTWORLD);
 let restoreStartup = true;
 const hashNavigation = createHashNavigation<Sea>({
