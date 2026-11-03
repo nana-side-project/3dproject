@@ -19,6 +19,8 @@ export const FIXED_EN = {
 };
 
 const EXACT: Record<string, string> = {
+  // (the sky's camera on a timed sight: its word, MULTICAM.md §3-1, TRIAL6.md §1-1)
+  夜明け: 'dawn', 島めぐり: 'round the island', 夕日: 'sunset',
   // (the fixed cameras' places, as they are now: MULTICAM.md §3-1)
   建てている途中: 'being built', 屋根まで: 'up to the roof', できている: 'standing', 組みかけの筏: 'a raft half lashed', 筏がある: 'the raft is here',
   筏は海に出ている: 'the raft is out at sea', 火が燃えている: 'a fire is burning', 器を乾かしている: 'vessels drying', 灯りがともっている: 'the lamp is lit',

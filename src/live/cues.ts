@@ -7,10 +7,12 @@
 
 /** first: a card (three clear notes); good / bad: a try come out, as it held or not (two notes, bright or low);
  *  decided: a try decided and said (one soft note); gather: a gathering beginning (two knocks of wood); gather-soon:
- *  five minutes before (one knock, small). */
-export type Cue = 'first' | 'good' | 'bad' | 'decided' | 'gather' | 'gather-soon';
-/** Which wins when two come together (PROGRAM.md §4's order: a first, a try's result, a try decided, the customs). */
-export const CUE_RANK: Record<Cue, number> = { first: 5, good: 4, bad: 4, decided: 3, gather: 2, 'gather-soon': 1 };
+ *  five minutes before (one knock, small); sight: a timed sight beginning — the dawn, the island round, the sunset, the
+ *  day's card (one note of the card's bell: TRIAL6.md §1-3). */
+export type Cue = 'first' | 'good' | 'bad' | 'decided' | 'gather' | 'gather-soon' | 'sight';
+/** Which wins when two come together (PROGRAM.md §4's order: a first, a try's result, a try decided, the customs — a
+ *  timed sight as strong as a gathering, TRIAL6.md §1-3). */
+export const CUE_RANK: Record<Cue, number> = { first: 5, good: 4, bad: 4, decided: 3, gather: 2, sight: 2, 'gather-soon': 1 };
 /** One every three minutes at most; a moment to see whether a stronger one comes with it; how long one waits for a
  *  voice to end before it is let go — a card's, shorter, then sounds all the same (it is on the screen for eight). */
 export const CUE_GAP_MS = 180_000, CUE_TOGETHER_MS = 400, CUE_VOICE_WAIT_MS = 10_000, CUE_CARD_WAIT_MS = 3_000;

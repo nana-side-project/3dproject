@@ -10,6 +10,7 @@ import { clamp, smooth, angDiff, rr, getStream, setStream, hyp } from './core/ma
 import { camFor, poseFor, sightOf, skyPose, lineClear, headOf, NEAR_M, OFF as CAM_OFF, DORON, type Pose } from './live/fleet';
 import { HEAD_TOP, OVER_HEAD } from './live/bubble';
 import { PLACES as FIXED_PLACES, placeSpots, placesOn, placeFixed, panAt, type PlaceId } from './live/fixed';
+import { sightNow, calmOf, dayStart, ROUND_S, type SightId } from './live/sights';
 import { holdUnseen } from './eco/unseen';
 import { LOCATIONS, DOTWORLD, type Sea } from './data/locations';
 import { worldKey, seaHash, seaForHash, migrateSeen } from './world/location-id';
@@ -31,7 +32,7 @@ import { buildOcean, buildOceanSteps, setSliceEnd } from './ocean/build';
 import { planRoute, alongRoute, floorCells, type RoutePlan } from './ocean/route';
 import { pickStart } from './ocean/start';
 import { globeScene, gcam, ll2v, gv, updateGlobe, tweenGlobe, earthMat, setGlobeFine } from './globe';
-import { clock, skyState, presetTime, localTimeString, SPEEDS, PRESET_LABEL, type Preset, setSeason, seasonOf, seaTemp, SEASON_LABEL, type Season } from './time/clock';
+import { clock, skyState, presetTime, localTimeString, SPEEDS, PRESET_LABEL, type Preset, setSeason, seasonOf, seaTemp, SEASON_LABEL, type Season, sunEvents } from './time/clock';
 import { Director, speciesOf, type Shot } from './director';
 import { activity, type Subject } from './eco/env';
 import { PERSONAS, personaById, line, type Persona, type Mood, type Taste } from './persona';
@@ -222,7 +223,7 @@ function endOpening(done: boolean) {
   arriveHere();
 }
 // watching one of the island's residents from above: the camera stays with it until let go
-const watch = { r: null as any, place: null as null | PlaceId, ang: 0, off: 0.45, el: 0.3, dist: 5.5, infoT: 0, pov: false, crabK: 0, crab: null as null | { x: number; y: number; z: number } };   // (crabK, crab: come down to a crab near it after dark)
+const watch = { r: null as any, place: null as null | PlaceId, sky: null as null | SightId, skyT0: 0, skyPts: [] as { x: number; y: number; z: number }[], ang: 0, off: 0.45, el: 0.3, dist: 5.5, infoT: 0, pov: false, crabK: 0, crab: null as null | { x: number; y: number; z: number } };   // (crabK, crab: come down to a crab near it after dark)
 // The drone fleet on the live screen (ADR 0010, stage 1; src/live/fleet.ts): a resident's camera is cut to, not flown to —
 // within NEAR_M, straight; further, through the sky for 3–5 s, the way there made ready meanwhile. Whether a resident's
 // camera sees it is asked twice a second at most. Only the picture: nothing of it reaches a resident.
@@ -269,8 +270,62 @@ function fixedPose(id: PlaceId, spot?: { x: number; y: number; z: number } | nul
   try { localStorage.setItem(FIXED_KEY, JSON.stringify({ epoch: fixedCams.epoch, at: fixedCams.at })); } catch (e) { /* kept for this page only */ }
   return p;
 }
-/** The pose a subject is cut to: a place's fixed camera, or a resident's (fleet.ts). */
-const subjPose = (r: any): Pose | null => (r?.place ? fixedPose(r.place) : fleetCam(r)?.pose ?? poseFor(r, cur!.T));
+// The sky's camera (13, above the island: MULTICAM.md §1, §3-1) for the day's timed sights (TRIAL6.md §1; src/live/
+// sights.ts): the island round — high over the places there now, each passed over in turn while it turns slowly about,
+// half a turn in its three minutes; the dawn and the sunset — high over the house, looking out over the sea to where the
+// sun comes up or goes down, its head turning very slowly. Nothing is seen through from it (#155), as from the sky between
+// two places; while it is on air the resident last followed stays followed underneath, as for a place's camera.
+const SKY_SUBJ: Record<string, { id: string; sky: SightId; no: string }> = Object.fromEntries((['dawn', 'round', 'dusk'] as SightId[]).map((k) => [k, { id: 'sky', sky: k, no: '13' }]));
+const SKY_D = 30, SKY_UP = 24, SKY_HIGH = 32;
+/** What the round passes over: the things the places' cameras look at now, else the hut's place. */
+function skyPts(): { x: number; y: number; z: number }[] {
+  const pts = placesNow().map((id) => fixedCams.at[id]).filter((p): p is Pose => !!p).map((p) => ({ x: p.lx, y: p.ly, z: p.lz }));
+  const hut = placeWorld()?.pl.hut;
+  if (!pts.length && hut && cur?.T) pts.push({ x: hut.x, y: cur.T.h(hut.x, hut.z) + 1, z: hut.z });
+  return pts;
+}
+/** The way to the sun on the ground (unit): where it comes up, or goes down. */
+function sunWay() { const s = U.uAirSun.value as THREE.Vector3, L = hyp(s.x, s.z) || 1; return { x: s.x / L, z: s.z / L }; }
+function skyCamPose(kind: SightId, t: number, pts = skyPts()): Pose | null {
+  const T = cur?.T; if (!T || !pts.length) return null;
+  const clear = (x: number, z: number, y: number) => Math.max(y, T.h(x, z) + 14, (T.over ? T.over(x, z) : -1e9) + 10);
+  if (kind === 'round') {   // (each place dwelt on, then glided to the next, through the second half of its share)
+    const n = pts.length, u = Math.min(n - 1e-6, (Math.max(0, t) / ROUND_S) * n), i = Math.floor(u), k = smooth(0.5, 1, u - i);
+    const a = pts[i], b = pts[Math.min(n - 1, i + 1)], tx = a.x + (b.x - a.x) * k, ty = a.y + (b.y - a.y) * k, tz = a.z + (b.z - a.z) * k;
+    const ang = 0.6 + (Math.max(0, t) / ROUND_S) * Math.PI, x = tx + Math.cos(ang) * SKY_D, z = tz + Math.sin(ang) * SKY_D;
+    return { x, y: clear(x, z, ty + SKY_UP), z, ang, off: 0, el: 0, dist: SKY_D, lx: tx, ly: ty, lz: tz };
+  }
+  const c = pts[0], w = sunWay(), p = panAt(t), cp = Math.cos(p), sp = Math.sin(p), dx = w.x * cp - w.z * sp, dz = w.x * sp + w.z * cp;
+  const x = c.x - w.x * 20, z = c.z - w.z * 20;   // (a little behind the house from the sun: the island before it, then the sea)
+  return { x, y: clear(x, z, c.y + SKY_HIGH), z, ang: Math.atan2(dz, dx), off: 0, el: 0, dist: 400, lx: x + dx * 400, ly: 2, lz: z + dz * 400 };
+}
+/** Whether the beach's camera has the sun's side of the sky in its picture — the west at the sunset (TRIAL6.md §1-1), the
+ *  east at the dawn (viewer design on #243): it looks within 50° of the way to the sun. */
+function beachSeesSun(): boolean {
+  const p = fixedCams.at.beach; if (!p) return false;
+  const w = sunWay(), lx = p.lx - p.x, lz = p.lz - p.z;
+  return (lx * w.x + lz * w.z) / (hyp(lx, lz) || 1) > Math.cos((50 * Math.PI) / 180);
+}
+/** The sun's rise and set on the island's day of ms (clock.ts sunEvents, kept for each day). */
+const sunDays = new Map<string, { rise: number; set: number }>();
+function sunOf(ms: number) {
+  if (!cur) return { rise: ms, set: ms };
+  const mid = dayStart(ms, cur.loc.tz ?? 9), k = `${cur.loc.id}:${mid}`; let s = sunDays.get(k);
+  if (!s) { const e = sunEvents(mid + 12 * 3.6e6, cur.loc); s = { rise: e.rise, set: e.set }; if (sunDays.size > 8) sunDays.clear(); sunDays.set(k, s); }
+  return s;
+}
+/** The camera's timed sight in its time now and the camera for it (TRIAL6.md §1-1): the dawn and the sunset on the
+ *  beach's camera (07) when it looks to the sun, else from above the island (13); the island round from above. */
+function sightCam(): { id: SightId; key: string; subj: any } | null {
+  const R: any = cur?.residents; if (!R || !cur?.T) return null;
+  const s = sightNow(clock.ms, cur.loc.tz ?? 9, sunOf, calmOf(R)); if (!s) return null;
+  const beach = placesNow().includes('beach');
+  const subj = s.id === 'round' ? SKY_SUBJ.round : beach && beachSeesSun() ? PLACE_SUBJ.beach : SKY_SUBJ[s.id];   // (the beach's, the dawn's as the sunset's, only looking to the sun: viewer design on #243)
+  if ('sky' in subj && !skyPts().length) return null;   // (nowhere for the sky's camera to look: no sight rather than one not put on)
+  return { ...s, subj };
+}
+/** The pose a subject is cut to: the sky's camera, a place's fixed camera, or a resident's (fleet.ts). */
+const subjPose = (r: any): Pose | null => (r?.sky ? skyCamPose(r.sky, 0) : r?.place ? fixedPose(r.place) : fleetCam(r)?.pose ?? poseFor(r, cur!.T));
 function fleetSees(r: any): boolean {
   if (!cur?.T) return true;
   const now = performance.now(), c = fleet.seen.get(r.id);
@@ -287,14 +342,16 @@ function fleetPlace(p: Pose) {
 /** Where the plants seen through are worked out to (#155): the head, middle and feet of the one watched; none in its eyes
  *  (pov) or with none watched. */
 function ghostAsk(r: any): (() => THREE.Vector3[]) | null {
+  if (watch.sky) return null;   // (from the sky, nothing is seen through)
   if (watch.place) { const p = fixedCams.at[watch.place]; return p ? () => [new THREE.Vector3(p.lx, p.ly - 0.6, p.lz), new THREE.Vector3(p.lx, p.ly, p.lz), new THREE.Vector3(p.lx, p.ly + 1.2, p.lz)] : null; }   // (a place: the thing itself)
   if (!r || watch.pov || !cur?.residents) return null;
   return () => { const f = r.pos, e = cur!.residents!.sense(r).eye; return [new THREE.Vector3(f.x, f.y + 0.15, f.z), new THREE.Vector3((f.x + e.x) / 2, (f.y + e.y) / 2, (f.z + e.z) / 2), e]; };
 }
 function fleetCutNow(r: any, p: Pose) {
   fleet.bridge = null;
+  if (r?.sky) { skyCutNow(r.sky, p); return; }
   if (r?.place) { placeCutNow(r.place, p); return; }
-  watch.place = null;
+  watch.place = null; watch.sky = null;
   startWatch(r);
   watch.ang = p.ang; watch.off = p.off; watch.el = p.el; watch.dist = p.dist;
   fleetPlace(p);
@@ -304,9 +361,18 @@ function fleetCutNow(r: any, p: Pose) {
 function placeCutNow(id: PlaceId, p: Pose) {
   fleet.bridge = null;
   if (!watch.r) { const R: any = cur?.residents; const near = R?.list?.slice().sort((a: any, b: any) => hyp(a.pos.x - p.lx, a.pos.z - p.lz) - hyp(b.pos.x - p.lx, b.pos.z - p.lz))[0]; if (near) startWatch(near); }
-  watch.place = id; fixedCams.t0 = performance.now();
+  watch.place = id; watch.sky = null; fixedCams.t0 = performance.now();
   fleetPlace(p);
   cur?.T.ghosts?.cut(camera.position, ghostAsk(null));
+}
+/** The sky's camera put on air (a timed sight): over the island; what the round passes over kept as it begins; the
+ *  resident followed stays underneath (the one nearest what it looks at, if none). */
+function skyCutNow(kind: SightId, p: Pose) {
+  fleet.bridge = null;
+  if (!watch.r) { const R: any = cur?.residents; const near = R?.list?.slice().sort((a: any, b: any) => hyp(a.pos.x - p.lx, a.pos.z - p.lz) - hyp(b.pos.x - p.lx, b.pos.z - p.lz))[0]; if (near) startWatch(near); }
+  watch.place = null; watch.sky = kind; watch.skyT0 = performance.now(); watch.skyPts = skyPts();
+  fleetPlace(p);
+  cur?.T.ghosts?.cut(camera.position, null);
 }
 function fleetCut(r: any) {
   if (!cur?.residents || !r) return;
@@ -317,7 +383,8 @@ function fleetCut(r: any) {
     return;
   }
   const p = subjPose(r); if (!p) return;
-  if (!watch.r || hyp(p.x - drone.pos.x, p.z - drone.pos.z) <= NEAR_M) { fleetCutNow(r, p); return; }
+  // (near, or to or from the sky's own camera: straight — it is the sky already)
+  if (r.sky || watch.sky || !watch.r || hyp(p.x - drone.pos.x, p.z - drone.pos.z) <= NEAR_M) { fleetCutNow(r, p); return; }
   // (far: up into the sky over the way, the way there made ready — the shore's plants packed round where it goes)
   fleet.bridge = { to: r, until: performance.now() + rr(3000, 5000), sky: skyPose(drone.pos, { x: p.x, y: p.y, z: p.z }, cur.T) };
   fleetPlace(fleet.bridge.sky);
@@ -332,7 +399,7 @@ function fleetCut(r: any) {
 const onAir = { at: 0, hiddenSince: 0 };
 function fleetOnAir(now: number) {
   const r = watch.r;
-  if (!live || !r || fleet.bridge || watch.pov || watch.place || !cur?.T) { onAir.hiddenSince = 0; return; }
+  if (!live || !r || fleet.bridge || watch.pov || watch.place || watch.sky || !cur?.T) { onAir.hiddenSince = 0; return; }
   if (now - onAir.at < 500) return; onAir.at = now;
   const c = camera.position, mid = r.pos.y + (r.sp?.living ? 0.3 : 0.55);
   const here: Pose = { x: c.x, y: c.y, z: c.z, ang: watch.ang, off: watch.off, el: watch.el, dist: watch.dist, lx: r.pos.x, ly: mid, lz: r.pos.z };
@@ -883,6 +950,14 @@ function updateDrone(dt: number, now: number) {
     // down to the camera there
     const b = fleet.bridge; drone.vel.set(0, 0, 0); drone.pos.set(b.sky.x, b.sky.y, b.sky.z);
     if (performance.now() >= b.until) { const q = subjPose(b.to); if (q) fleetCutNow(b.to, q); else fleet.bridge = null; }
+  } else if (watch.sky && watch.r) {
+    // the sky's camera (13, a timed sight): over the island, as skyCamPose has it second by second
+    const p = skyCamPose(watch.sky, (performance.now() - watch.skyT0) / 1000, watch.skyPts);
+    if (p) {
+      drone.vel.set(0, 0, 0); drone.pos.set(p.x, p.y, p.z);
+      const lx = p.lx - p.x, ly = p.ly - p.y, lz = p.lz - p.z;
+      drone.yaw = Math.atan2(-lx, -lz); drone.pitch = Math.atan2(ly, hyp(lx, lz));
+    }
   } else if (watch.place && watch.r) {
     // a place's fixed camera (stage 2): where it was put, looking at the thing, its head turning very slowly
     const p = fixedCams.at[watch.place];
@@ -3940,10 +4015,10 @@ resize();
 updateGlobeTimes();
 requestAnimationFrame(frame);
 if (live && (!location.hash || location.hash === '#')) history.replaceState(null, '', location.pathname + location.search + '#planet');   // (the stream is the island)
-if (live) import('./live/live').then((m) => { liveUi = m.makeLive({ residents: () => (mode === 'ocean' ? cur?.residents ?? null : null), watched: () => fleet.bridge?.to ?? (watch.place ? PLACE_SUBJ[watch.place] : watch.r), watch: (r) => fleetCut(r), clockMs: () => clock.ms, tz: () => cur?.loc.tz ?? 9, cam: (who, pri, kind, why) => rehearsal?.cam(who, pri, kind, why),
-  visible: (r) => (r?.place ? true : fleetSees(r)), skip: (who, pri, why) => rehearsal?.event('cam-skip', `${DORON[who] ?? '13'} ${who} ${why}`, false), bridging: () => !!fleet.bridge,
+if (live) import('./live/live').then((m) => { liveUi = m.makeLive({ residents: () => (mode === 'ocean' ? cur?.residents ?? null : null), watched: () => fleet.bridge?.to ?? (watch.sky ? SKY_SUBJ[watch.sky] : watch.place ? PLACE_SUBJ[watch.place] : watch.r), watch: (r) => fleetCut(r), clockMs: () => clock.ms, tz: () => cur?.loc.tz ?? 9, cam: (who, pri, kind, why) => rehearsal?.cam(who, pri, kind, why),
+  visible: (r) => (r?.place || r?.sky ? true : fleetSees(r)), skip: (who, pri, why) => rehearsal?.event('cam-skip', `${DORON[who] ?? '13'} ${who} ${why}`, false), bridging: () => !!fleet.bridge,
   cue: (c) => cue(c), speaking: () => speaking(), cueLog: (c, sounded, why) => rehearsal?.event('cue', sounded ? c : `${c}（鳴らさず：${why}）`, sounded),
-  headAt: (r, sight) => headAt(r, sight), sayLog: (mode, who, why) => rehearsal?.event('say', `${mode} ${who}${why ? ` ${why}` : ''}`, false), places: () => placesNow().map((id) => ({ subj: PLACE_SUBJ[id], at: fixedCams.at[id]! })),
+  headAt: (r, sight) => headAt(r, sight), sayLog: (mode, who, why) => rehearsal?.event('say', `${mode} ${who}${why ? ` ${why}` : ''}`, false), places: () => placesNow().map((id) => ({ subj: PLACE_SUBJ[id], at: fixedCams.at[id]! })), sun: (ms) => sunOf(ms), sight: () => sightCam(), sightEnd: (id, how, why) => rehearsal?.event('sight-end', `${id} ${how}${why ? ` ${why}` : ''}`, false),
   placeState: (id) => { const w = placeWorld(); return w && { built: w.R.list.find((x: any) => x.id === 'dot')?.stats?.built ?? 0, roofN: w.pl.roofN, hutN: w.pl.hutN,
     raft: { parts: w.v.raft.parts ?? 0, n: w.pl.raftN, away: w.R.list.some((x: any) => x.task?.kind === 'voyage' && x.task.data?.started) }, firing: w.firing, boiling: w.boiling, drying: false, lit: w.lit }; } }); });
 // Where a resident's head is on the screen, for the speech bubble (BUBBLE.md §2–3; src/live/bubble.ts): the point 12 cm
@@ -4031,7 +4106,7 @@ if (/[?&]lab\b/.test(location.search)) {
     },
   }));
 }
-if (location.search.includes('debug')) (window as any).seaglass = { get live() { return liveUi; }, get fleet() { return fleet; }, fleetCut: (id: string) => fleetCut((PLACE_SUBJ as any)[id] ?? cur?.residents?.list.find((r: any) => r.id === id)), get fixed() { return { ...fixedCams, place: watch.place, now: placesNow() }; }, get hints() { return hints; }, replay, get cur() { return cur; }, clock, drone, camera, swellAt, stepDrone: (dt: number) => updateDrone(dt, performance.now()), persona: (id: string) => setPersona(personaById(id)), watch, startWatch: (id: string) => startWatch(cur!.residents!.list.find((r: any) => r.id === id)), setPov: (on: boolean) => setPov(on), U, director, renderLeap, lobosVisit: () => cur?.lobosVisitors?.force(drone.pos) ?? false, goTo, dive: async (id: string) => { const l = seaForHash('#' + id, LOCATIONS, DOTWORLD); if (!l) return; if (mode === 'ocean') await toGlobe(); await dive(l); }, seaLog, forceMeteors, minimap, get bait() { return cur?.bait; }, fly: () => { if (drone.sky) flyRun = { burst: false, t: 0, side: 1 }; else { const fx = -Math.sin(drone.yaw), fz = -Math.cos(drone.yaw); cur?.flyfish?.burst(drone.pos.x + fx * 9, drone.pos.z + fz * 9, Math.atan2(fz, fx) + 0.8); } return !!cur?.flyfish; }, get flyRun() { return flyRun; }, breach: (kind: 'whale' | 'manta' = 'whale') => { const fx = -Math.sin(drone.yaw), fz = -Math.cos(drone.yaw); return cur?.breach.force(kind, drone.pos, fx, fz); }, rare: (id: string) => { const fx = -Math.sin(drone.yaw), fz = -Math.cos(drone.yaw); return cur?.rare.start(id, cur.eco.env, drone.pos, fx, fz); }, pip: () => ({ pipOn, subj: pipSubj?.key, fade: pipFade, hidden: $('pip').hidden, rect: $('pip').getBoundingClientRect().toJSON() }), thumbs: () => guideThumbs(cur!.loc, guideEntries(cur!.loc).map((e) => e.id)), get opening() { return opening && { t: opening.t, len: opening.plan.len, view: viewMode, k: openK, white: +$('openWhite').style.opacity }; }, get tourQ() { return tourQ.map((t) => t.label); }, get dayLot() { return cur?.eco.dayLot; }, autoTier: (t: Tier) => setQuality(t, true), setGrass, gv, ahead: () => ({ job: job?.loc.id ?? null, stage: job?.stage ?? null, built: Object.keys(oceans), budget: Math.round(aheadBudget), base: Math.round(globeGap) }), get tiers() { return { tier, seaTier, renderScale, pipOn }; }, scene: oceanScene, tap: (x: number, y: number) => tapAt(x, y), pick: (x: number, y: number) => pickAt(x, y)?.key ?? null, seabedAt: (x: number, y: number) => seabedAt(x, y)?.d ?? null, studio: (id: string, view: [number, number, number], zoom = 1, focus: [number, number, number] | null = null, set: Record<string, number> = {}) => studio(cur!.loc, id, view, zoom, focus, set), closeShot: (p: [number, number, number], at: [number, number, number]) => { camera.position.set(...p); camera.lookAt(...at); camera.updateMatrixWorld(); U.uCamPos.value.copy(camera.position); U.uLodPos.value.copy(camera.position); renderer.setRenderTarget(null); renderer.render(oceanScene, camera); },   // (LAB: one frame from a given point, straight to the canvas)
+if (location.search.includes('debug')) (window as any).seaglass = { get live() { return liveUi; }, get fleet() { return fleet; }, fleetCut: (id: string) => fleetCut(id.startsWith('sky:') ? SKY_SUBJ[id.slice(4)] : (PLACE_SUBJ as any)[id] ?? cur?.residents?.list.find((r: any) => r.id === id)), get fixed() { return { ...fixedCams, place: watch.place, sky: watch.sky, now: placesNow(), sight: sightCam() }; }, get hints() { return hints; }, replay, get cur() { return cur; }, clock, drone, camera, swellAt, stepDrone: (dt: number) => updateDrone(dt, performance.now()), persona: (id: string) => setPersona(personaById(id)), watch, startWatch: (id: string) => startWatch(cur!.residents!.list.find((r: any) => r.id === id)), setPov: (on: boolean) => setPov(on), U, director, renderLeap, lobosVisit: () => cur?.lobosVisitors?.force(drone.pos) ?? false, goTo, dive: async (id: string) => { const l = seaForHash('#' + id, LOCATIONS, DOTWORLD); if (!l) return; if (mode === 'ocean') await toGlobe(); await dive(l); }, seaLog, forceMeteors, minimap, get bait() { return cur?.bait; }, fly: () => { if (drone.sky) flyRun = { burst: false, t: 0, side: 1 }; else { const fx = -Math.sin(drone.yaw), fz = -Math.cos(drone.yaw); cur?.flyfish?.burst(drone.pos.x + fx * 9, drone.pos.z + fz * 9, Math.atan2(fz, fx) + 0.8); } return !!cur?.flyfish; }, get flyRun() { return flyRun; }, breach: (kind: 'whale' | 'manta' = 'whale') => { const fx = -Math.sin(drone.yaw), fz = -Math.cos(drone.yaw); return cur?.breach.force(kind, drone.pos, fx, fz); }, rare: (id: string) => { const fx = -Math.sin(drone.yaw), fz = -Math.cos(drone.yaw); return cur?.rare.start(id, cur.eco.env, drone.pos, fx, fz); }, pip: () => ({ pipOn, subj: pipSubj?.key, fade: pipFade, hidden: $('pip').hidden, rect: $('pip').getBoundingClientRect().toJSON() }), thumbs: () => guideThumbs(cur!.loc, guideEntries(cur!.loc).map((e) => e.id)), get opening() { return opening && { t: opening.t, len: opening.plan.len, view: viewMode, k: openK, white: +$('openWhite').style.opacity }; }, get tourQ() { return tourQ.map((t) => t.label); }, get dayLot() { return cur?.eco.dayLot; }, autoTier: (t: Tier) => setQuality(t, true), setGrass, gv, ahead: () => ({ job: job?.loc.id ?? null, stage: job?.stage ?? null, built: Object.keys(oceans), budget: Math.round(aheadBudget), base: Math.round(globeGap) }), get tiers() { return { tier, seaTier, renderScale, pipOn }; }, scene: oceanScene, tap: (x: number, y: number) => tapAt(x, y), pick: (x: number, y: number) => pickAt(x, y)?.key ?? null, seabedAt: (x: number, y: number) => seabedAt(x, y)?.d ?? null, studio: (id: string, view: [number, number, number], zoom = 1, focus: [number, number, number] | null = null, set: Record<string, number> = {}) => studio(cur!.loc, id, view, zoom, focus, set), closeShot: (p: [number, number, number], at: [number, number, number]) => { camera.position.set(...p); camera.lookAt(...at); camera.updateMatrixWorld(); U.uCamPos.value.copy(camera.position); U.uLodPos.value.copy(camera.position); renderer.setRenderTarget(null); renderer.render(oceanScene, camera); },   // (LAB: one frame from a given point, straight to the canvas)
   setWx: (w: Partial<Weather>) => { wx = { ...FAIR, ok: true, at: Date.now(), ...w }; if (cur) applySky(cur.loc); } };
 
 declare const __BUILD__: string;
