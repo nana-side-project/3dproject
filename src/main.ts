@@ -82,18 +82,19 @@ const live = /[?&]live\b/.test(location.search);
 // A new island (D36/D37: the trials on a new island and December's): ?newisland=<today's date, JST, YYYY-MM-DD> — before the
 // island is made, the one kept in this browser is put away (written out first by hand: seaglassRehearsal.saveOut(),
 // docs/rehearsal/RUNBOOK.md) and the island's calendar starts now, on island June 1st of year 1. With a time,
-// ?newisland=YYYY-MM-DDTHH:MM (JST), it starts at that time to the minute, opened within two hours of it — trial 6, trial 7
-// and December all at 08:00, so all three have the same weather in the same order (the record is read by the island's
-// date and the real hour: science on #225). Only on the day it names, so an old link opened again does nothing; taken off
-// the address once done, so a reload goes on with the new island.
+// ?newisland=YYYY-MM-DDTHH:MM[:SS] (JST), it starts at that time to the minute, opened in the two hours after it — trial 6,
+// trial 7 and December all at 08:00, so all three have the same weather in the same order (the record is read by the
+// island's date and the real hour: science on #225). Not earlier than five minutes before it (a clock a little slow), so
+// the island is never long on the day before its June 1st (science on #233). Only on the day it names, so an old link
+// opened again does nothing; taken off the address once done, so a reload goes on with the new island.
 const newIslandAt = (() => {
   const want = new URLSearchParams(location.search).get('newisland'), today = new Date(Date.now() + 9 * 3.6e6).toISOString().slice(0, 10);
   if (!want) return 0;
   const q = new URLSearchParams(location.search); q.delete('newisland');
   history.replaceState(null, '', `${location.pathname}${q.toString() ? `?${q.toString().replace(/=(&|$)/g, '$1')}` : ''}${location.hash}`);
-  const [day, time] = want.split('T'), at = time ? Date.parse(`${day}T${time}:00+09:00`) : Date.now();
+  const [day, time] = want.split('T'), at = time ? Date.parse(`${day}T${/^\d\d:\d\d$/.test(time) ? `${time}:00` : time}+09:00`) : Date.now();
   if (day !== today) { console.warn(`newisland=${want}: not today (${today}) — nothing done`); return 0; }
-  if (!(at > 0) || Math.abs(Date.now() - at) > 2 * 3.6e6) { console.warn(`newisland=${want}: not a time within two hours of now — nothing done`); return 0; }
+  if (!(at > 0) || Date.now() < at - 5 * 60e3 || Date.now() > at + 2 * 3.6e6) { console.warn(`newisland=${want}: open it in the two hours after that time (from five minutes before) — nothing done`); return 0; }
   try { localStorage.removeItem('seaglass.residents.v1'); } catch (e) { return 0; }
   setIslandEpoch(at); return at;
 })();
