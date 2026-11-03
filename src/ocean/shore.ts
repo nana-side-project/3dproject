@@ -13,6 +13,7 @@ import { hash, smooth, R, rr, mulberry32, getStream, setStream } from '../core/m
 import { WORLD } from './scenery';
 import { landOf, type Land } from './land';
 import { buildForest } from './forest';
+import { GHOST_VS, GHOST_FS, ghostable, makeGhosts, type GhostPlant } from './ghost';
 import { Solids } from '../robots/solids';
 
 // (the open air's light: render/airlit.ts, kept exported from here for the shore's users)
@@ -257,25 +258,28 @@ export function buildShore(loc: any, group: THREE.Group, T: any, obst: { raise(x
   // build: drawn all the same, so the island's later draws — and its residents' days — stay as they were)
   for (let k = 0; k < 52; k++) Math.random();
   const plantMat = mat(
-    `attribute vec3 aTint; attribute float aSway; varying vec3 vWp; varying vec3 vN; varying vec3 vCol;
+    GHOST_VS + `attribute vec3 aTint; attribute float aSway; varying vec3 vWp; varying vec3 vN; varying vec3 vCol;
      void main(){
        vec4 w = modelMatrix * instanceMatrix * vec4(position, 1.0);
        float ph = instanceMatrix[3].x * 0.37 + instanceMatrix[3].z * 0.23;
        float wk = clamp(uWind.z / 10.0, 0.0, 1.8);
        w.xz += vec2(sin(uTime * 1.3 + ph), cos(uTime * 1.1 + ph * 1.7)) * aSway * (0.06 + 0.1 * wk) + uWind.xy * aSway * wk * wk * 0.08 * (0.7 + 0.3 * sin(uTime * 1.7 + ph));
        vWp = w.xyz; vN = normalize(mat3(modelMatrix) * mat3(instanceMatrix) * normal);
-       vCol = aTint * (0.85 + 0.3 * fract(sin(ph * 12.9) * 43758.5));
+       vCol = aTint * (0.85 + 0.3 * fract(sin(ph * 12.9) * 43758.5)); ghostVs();
        gl_Position = projectionMatrix * viewMatrix * w; }`,
-    `${AIRLIT}
+    `${AIRLIT}${GHOST_FS}
      varying vec3 vWp; varying vec3 vN; varying vec3 vCol;
      void main(){
-       if (cutSight(vWp)) discard;   // (the leaves between the camera and a resident being watched)
+       if (ghostCut()) discard;   // (a plant seen through, between the camera and a resident being watched: ocean/ghost.ts)
        vec3 n = normalize(vN); if (!gl_FrontFacing) n = normalize(-n * 0.4 + vec3(0.0, 0.9, 0.0));   // (a leaf seen from beneath: the light comes through it)
        n = normalize(n + vec3(0.0, 0.35, 0.0));
-       gl_FragColor = vec4(fogIt(airLit(vCol, n, vWp, 0.7), vWp), 1.0);
-     }`, { opts: { side: THREE.DoubleSide } });
+       gl_FragColor = vec4(fogIt(ghostCol(airLit(vCol, n, vWp, 0.7)), vWp), ghostA(1.0));
+     }`, { opts: { side: THREE.DoubleSide, alphaToCoverage: true } });
   const e = new THREE.Euler(), q = new THREE.Quaternion(), m4 = new THREE.Matrix4(), p3 = new THREE.Vector3(), s3 = new THREE.Vector3();
   let count = 0;
+  // (the plants that may be seen through, between the camera and a resident being watched — the beach's growing ones,
+  // each as the upright cylinder its drawn shape fills; not the driftwood or the rocks: ocean/ghost.ts)
+  const ghosts = makeGhosts(), fixedGhosts: GhostPlant[] = [];
   // Dot's world has none of the casuarina, brought to the Ryukyus by people (owner 2026-10-26: only what has always
   // lived on the island; 2026-10-31, the nature team's proposal): there the same places along the forest edge, the same
   // heights, are the beach forest's own trees — テリハボク, and ハスノハギリ among them (below, once the forest is built).
@@ -285,6 +289,12 @@ export function buildShore(loc: any, group: THREE.Group, T: any, obst: { raise(x
     const list = lists[kind]; if (!list.length) continue;
     const mesh = native && kind === 'casuarina' ? null : new THREE.InstancedMesh(geos[kind], plantMat, list.length);
     if (!mesh) THREE.MathUtils.generateUUID();   // (the id the casuarinas' mesh drew)
+    if (mesh && kind !== 'drift' && kind !== 'rock') {
+      ghostable(mesh);
+      const g = geos[kind]; if (!g.boundingBox) g.computeBoundingBox();
+      const bb = g.boundingBox!, wide = Math.max(-bb.min.x, bb.max.x, -bb.min.z, bb.max.z);
+      list.forEach((it, i) => fixedGhosts.push({ mesh, i, key: kind + i, x: it.x, z: it.z, y0: it.y - 0.1, y1: it.y - 0.1 + bb.max.y * it.s, r: Math.max(0.4, wide * it.s), g: 0, t: 0 }));
+    }
     list.forEach((it, i) => {
       q.setFromEuler(e.set((R() - 0.5) * 0.12, it.ry, (R() - 0.5) * 0.12));
       if (kind === 'drift') s3.set(it.s, it.s * 0.45, it.s * 0.45); else s3.set(it.s * rr(0.85, 1.15), it.s, it.s * rr(0.85, 1.15));
@@ -298,7 +308,9 @@ export function buildShore(loc: any, group: THREE.Group, T: any, obst: { raise(x
   // (the beach plants' shapes and how they are drawn, for what grows by the residents' home — the young casuarinas
   // Dot clears for the field: robots/residents.ts. Shared: not to be disposed of)
   T.plantLook = { geo: geos, mat: plantMat };
-  const forest = buildForest(AIRLIT, group, f, can, top, FAR);
+  ghosts.setFixed(fixedGhosts);
+  T.ghosts = ghosts;   // (the camera says each frame whom it watches, and from where: main.ts)
+  const forest = buildForest(AIRLIT, group, f, can, top, FAR, ghosts);
   // Dot's world: the beach trees, as the forest draws its own (one of its two shapes of each kind, its light, its sway).
   // Which kind and which shape stand at a place is the place's own (no random draws); each as tall as the casuarina was,
   // as wide as its kind grows. Near the camera the fine shape, the coarser one further off — as the forest is drawn
@@ -319,18 +331,23 @@ export function buildShore(loc: any, group: THREE.Group, T: any, obst: { raise(x
       for (const kind of [0, 2]) for (const v of [0, 1]) for (const lo of [false, true]) {
         const n = natives.filter((t) => t.kind === kind && t.v === v).length; if (!n) continue;
         const sh = forest.shape(kind, v), mesh = new THREE.InstancedMesh(lo ? sh.lo : sh.geo, sh.mat, n);
-        mesh.frustumCulled = false; mesh.count = 0; mesh.userData.beachTrees = lo ? "far" : "near"; group.add(mesh); meshes.push({ kind, v, lo, mesh });
+        mesh.frustumCulled = false; mesh.count = 0; mesh.userData.beachTrees = lo ? "far" : "near"; ghostable(mesh); group.add(mesh); meshes.push({ kind, v, lo, mesh });
       }
     } finally { Math.random = keepM; }
     const at = new THREE.Vector3(1e9, 0, 1e9), NEAR = 110;
     nativeUpdate = (c: THREE.Vector3, now = false) => {
       if (!now && (c.x - at.x) ** 2 + (c.z - at.z) ** 2 < 15 * 15) return;
       at.copy(c);
+      const seen: GhostPlant[] = [];   // (each as the forest's own: its trunk's girth wide, as tall as it stands)
       for (const o of meshes) {
         let n = 0;
-        for (const t of natives) if (t.kind === o.kind && t.v === o.v && ((t.it.x - c.x) ** 2 + (t.it.z - c.z) ** 2 < NEAR * NEAR) !== o.lo) o.mesh.setMatrixAt(n++, t.m);
+        for (const t of natives) if (t.kind === o.kind && t.v === o.v && ((t.it.x - c.x) ** 2 + (t.it.z - c.z) ** 2 < NEAR * NEAR) !== o.lo) {
+          seen.push({ mesh: o.mesh, i: n, key: 'beach' + natives.indexOf(t), x: t.it.x, z: t.it.z, y0: t.it.y - 0.1, y1: t.it.y - 0.1 + t.it.s, r: Math.max(0.6, 0.5 * Math.hypot(t.m.elements[0], t.m.elements[2])), g: 0, t: 0 });
+          o.mesh.setMatrixAt(n++, t.m);
+        }
         o.mesh.count = n; o.mesh.instanceMatrix.needsUpdate = true;
       }
+      ghosts.setMoving(seen, 'beach');
     };
     count += natives.length;
     // (and the young trees by the residents' home, Dot's to clear for the field: young オオハマボウ, as the forest's
