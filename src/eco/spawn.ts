@@ -2,11 +2,12 @@
 // 2026-11-02). In the Sekisei lagoon the Acropora spawn on a night from three days before the full moon of May to two
 // days after it (a June full moon in some years), one to four hours after sunset.
 // - Dot's world (owner, 2026-11-02, plan C): the island's months 4 to 6, the real moon 3 days before to 2 days after
-//   full, 1 to 4 hours after the real sunset; at most one night an island year — the first in the window that has it
-//   all. (An island month is some 2.3 real days and the moon keeps the real month, so some island years have none.)
+//   full, 1 to 4 hours after the real sunset; at most one night an island year — of the nights in the window, the
+//   nearest the full moon (of two as near, the earlier: owner 2026-11-03; till then, the first). (An island month is
+//   some 2.3 real days and the moon keeps the real month, so some island years have none.)
 // - The Earth's Kayama: 3 nights before May's full moon (the first dated in May) to 2 after — or June's, in a year whose
 //   May full moon comes in the first week of May (proposed: the sea not yet warm enough so early) — 1 to 4 hours after
-//   sunset; one night a year, the first in the window.
+//   sunset; one night a year, the nearest the full moon in the window (as in Dot's world).
 // A world's fact, the same for everyone who looks: worked out from the real moment alone, nothing drawn at random.
 import { sunEvents } from '../time/clock';
 import { moon } from '../time/astro';
@@ -43,14 +44,15 @@ function fullDay(ms: number, site: Site) {
 }
 /** How many nights this night is from the full moon's: by local date, -3 (three before) .. +2 (two after). */
 export function nightsFromFull(mid: number, site: Site) { return dayNo(mid, site) - fullDay(mid, site); }
-/** Whether this night (the middle of its evening) is in the season and the moon: not yet whether it is the first.
- *  The season is the month of the real day at noon — in Dot's world the island's month then (as the sea's env.month). */
-function fits(mid: number, site: Site) {
+/** How many nights this night is from its full moon, when it is in the season and the moon's window (-3 .. +2);
+ *  null when not. The season is the month of the real day at noon — in Dot's world the island's month then (as the
+ *  sea's env.month). */
+function off(mid: number, site: Site): number | null {
   const noon = dayNo(mid, site) * DAY + 12 * HOUR - site.tz * HOUR;
-  if (!site.world) { const n = dayNo(mid, site) - earthFull(local(noon, site).getUTCFullYear(), site); return n >= -3 && n <= 2; }
-  const n = nightsFromFull(mid, site);
-  if (n < -3 || n > 2) return false;
-  const m = islandDate(noon).month; return m >= 4 && m <= 6;
+  const n = site.world ? nightsFromFull(mid, site) : dayNo(mid, site) - earthFull(local(noon, site).getUTCFullYear(), site);
+  if (n < -3 || n > 2) return null;
+  if (site.world) { const m = islandDate(noon).month; if (m < 4 || m > 6) return null; }
+  return n;
 }
 /** Which year the night belongs to (the island's year in Dot's world). */
 const yearOf = (mid: number, site: Site) => { const noon = dayNo(mid, site) * DAY + 12 * HOUR - site.tz * HOUR; return site.world ? islandDate(noon).year : local(noon, site).getUTCFullYear(); };
@@ -63,13 +65,17 @@ export function spawnWindow(ms: number, site: Site): [number, number] | null {
   // (Dot's world: by the island's own calendar, which a new island begins afresh — #225: kept apart by its start)
   const key = `${site.world ? `${site.world}@${islandEpoch()}` : 'earth'}:${site.lat}:${site.lon}:${a}`;
   if (cache.has(key)) return cache.get(key)!;
-  const mid = (a + b) / 2;
-  let ok = fits(mid, site);
-  // the first such night of its year: none on the nights before it, back to the year's start (or the season's)
-  for (let k = 1; ok && k <= 40; k++) {
-    const [pa, pb] = evening(mid - k * DAY, site), pm = (pa + pb) / 2;
-    if (yearOf(pm, site) !== yearOf(mid, site)) break;
-    if (fits(pm, site)) ok = false;
+  const mid = (a + b) / 2, n = off(mid, site);
+  // the one night of its year: of the nights in the window, the nearest the full moon (of two as near, the earlier) —
+  // owner 2026-11-03 (science: the reef spawns about the full moon, not on the first night it could). So no night
+  // nearer, nor one as near before it: back to the year's start (or the season's), and on through the window's end
+  let ok = n !== null;
+  for (let k = -40; ok && k <= 6; k++) {
+    if (k === 0) continue;
+    const [pa, pb] = evening(mid + k * DAY, site), pm = (pa + pb) / 2;
+    if (yearOf(pm, site) !== yearOf(mid, site)) { if (k < 0) continue; break; }
+    const m = off(pm, site);
+    if (m !== null && (Math.abs(m) < Math.abs(n!) || (Math.abs(m) === Math.abs(n!) && k < 0))) ok = false;
   }
   const w: [number, number] | null = ok ? [a, b] : null;
   if (cache.size > 64) cache.clear();

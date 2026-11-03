@@ -1,10 +1,11 @@
-// The reef's spawning night at Kayama (eco/spawn.ts; specs/kayama-sea-r031.md, owner 2026-11-02 plan C). Every real
-// night over many years, both worlds: is it the spawning night, and if so does it keep the rule —
+// The reef's spawning night at Kayama (eco/spawn.ts; specs/kayama-sea-r031.md, owner 2026-11-02 plan C, 2026-11-03).
+// Every real night over many years, both worlds: is it the spawning night, and if so does it keep the rule —
 // Dot's world: island months 4–6, the real moon 3 days before to 2 days after full, its evening 1–4 h after the real
-// sunset, at most one night an island year (science's figures: some 41 % of island years have one; the longest real
-// gap some 336 days). The Earth: by May's full moon (June's in a year whose May full moon is in the first week of May),
-// the same nights and hours, exactly one night a year. Also that the sea's rare event on that evening is the spawning, and never on
-// another evening at Kayama.
+// sunset, at most one night an island year: of those in the window, the nearest the full moon (of two as near, the
+// earlier; owner 2026-11-03), worked out here on its own (science's figures: some 41 % of island years have one; the
+// longest real gap 359 days). The Earth: by May's full moon (June's in a year whose May full moon is in the first week
+// of May), the same nights and hours, exactly one night a year. Also a new island's own calendar, and that the sea's
+// rare event on that evening is the spawning, and never on another evening at Kayama.
 // Usage: npx tsx --import ./scripts/node-assets.mjs scripts/spawn-check.ts   (env ISLAND_YEARS 600, EARTH_YEARS 80)
 import { spawnWindow, nightsFromFull as fromFull } from '../src/eco/spawn';
 import { islandDate, ISLAND_EPOCH, setIslandEpoch } from '../src/world/island-time';
@@ -20,10 +21,13 @@ const bad = (what: string) => { fail++; if (fail < 20) console.log('  ✗', what
 // Dot's world
 {
   const Y = +(process.env.ISLAND_YEARS || 600), end = ISLAND_EPOCH + Y * 28 * DAY;
-  const byYear = new Map<number, number[]>(), nights: number[] = [];
+  const byYear = new Map<number, number[]>(), nights: number[] = [], cands = new Map<number, [number, number][]>(), dist: Record<number, number> = {};
   for (let d = ISLAND_EPOCH; d < end; d += DAY) {
     const ev = sunEvents(d + 12 * HOUR, dot), mid = ev.set + 2.5 * HOUR, w = spawnWindow(mid, dot);
+    // (worked out here on its own: the nights that could be, island months 4–6 and 3 before to 2 after full)
+    { const idn = islandDate(ev.noon), fn = fromFull(mid, dot); if (idn.month >= 4 && idn.month <= 6 && fn >= -3 && fn <= 2) cands.set(idn.year, [...(cands.get(idn.year) ?? []), [mid, fn]]); }
     if (!w) continue;
+    dist[fromFull(mid, dot)] = (dist[fromFull(mid, dot)] ?? 0) + 1;
     const id = islandDate(ev.noon), f = fromFull(mid, dot);
     if (id.month < 4 || id.month > 6) bad(`dot: island month ${id.month}`);
     if (f < -3 || f > 2) bad(`dot: ${f} nights from full`);
@@ -34,10 +38,16 @@ const bad = (what: string) => { fail++; if (fail < 20) console.log('  ✗', what
   }
   const first = islandDate(ISLAND_EPOCH).year, last = islandDate(end).year - 1, years = last - first;
   for (const [y, l] of byYear) if (l.length > 1) bad(`dot: island year ${y} has ${l.length} nights`);
+  // the night chosen: of those that could be, the nearest the full moon — of two as near, the earlier (owner 2026-11-03)
+  for (const [y, c] of cands) {
+    if (y < first + 1 || y > last) continue;   // (the first and last island years: cut short by the run)
+    const want = c.reduce((b, x) => (Math.abs(x[1]) < Math.abs(b[1]) ? x : b))[0], got = byYear.get(y)?.[0];
+    if (got !== want) bad(`dot: island year ${y}: chose ${got ? new Date(got + 9 * HOUR).toISOString().slice(0, 10) : 'none'}, the nearest the full moon is ${new Date(want + 9 * HOUR).toISOString().slice(0, 10)}`);
+  }
   let gap = 0; for (let i = 1; i < nights.length; i++) gap = Math.max(gap, (nights[i] - nights[i - 1]) / DAY);
   const share = byYear.size / years;
   if (share < 0.3 || share > 0.55) bad(`dot: ${(share * 100).toFixed(0)} % of island years`);
-  console.log(`Dot's world: ${years} island years — a spawning night in ${byYear.size} (${(share * 100).toFixed(0)} %), longest real gap ${gap.toFixed(0)} days`);
+  console.log(`Dot's world: ${years} island years — a spawning night in ${byYear.size} (${(share * 100).toFixed(0)} %), longest real gap ${gap.toFixed(0)} days; nights from full ${[-3, -2, -1, 0, 1, 2].map((k) => `${k >= 0 ? '+' : ''}${k}: ${dist[k] ?? 0}`).join(', ')}`);
 }
 // a new island (#225: its calendar begins afresh, on island June 1st, the moment it begins): the night follows its own
 // calendar — asked again the same evening once the start has changed, the answer is the new island's, not the old one's
@@ -78,6 +88,8 @@ const bad = (what: string) => { fail++; if (fail < 20) console.log('  ✗', what
     if (!((fm.getUTCMonth() === 4 && fm.getUTCDate() > 7) || fm.getUTCMonth() === 5)) bad(`earth ${y}: by the full moon of ${fm.toISOString().slice(0, 10)}`);
     if (m < 4 || m > 6) bad(`earth ${y}: month ${m}`);
     if (f < -3 || f > 2) bad(`earth ${y}: ${f} nights from full`);
+    // (the Earth's window is never cut short: the nearest the full moon is its own night)
+    if (f !== 0) bad(`earth ${y}: ${f} nights from full, not the full moon's own`);
     if (m === 6) june++;
     if (process.env.LIST) console.log(`  ${y}: ${new Date(got[0] + 9 * HOUR).toISOString().slice(0, 10)} (${f >= 0 ? '+' : ''}${f} nights)`);
   }
