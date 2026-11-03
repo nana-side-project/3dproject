@@ -39,16 +39,16 @@ const H = (t: number) => +((t - T0) / 3.6e6).toFixed(1);
 const ago = (i: number) => { const t = reads[i].t - DAY; let b = -1; for (let j = i; j >= 0; j--) { if (reads[j].run !== reads[i].run) break; if (Math.abs(reads[j].t - t) < DAY * 0.5 && (b < 0 || Math.abs(reads[j].t - t) < Math.abs(reads[b].t - t))) b = j; } return b; };
 const dm: number[] = [], da: number[] = [];
 let k = 0, h3: any = null; const notes: string[] = []; const sc = { hits: 0, falses: 0, misses: 0, leads: [] as number[] };
-const SS = storms.map((s) => ({ ...s, caught: false, settled: false, seen: false })); let status = 'testing', firstJudge: any = null;
+const SS = storms.map((s) => ({ ...s, caught: false, settled: false, seen: false })); let status = "testing", firstJudge: any = null, first: any = null;
 const judge = (t: number) => { const wrong = sc.falses + sc.misses, s = sc.hits >= 2 && sc.hits >= wrong ? 'held' : wrong >= 3 && sc.hits * 2 < wrong ? 'doubted' : 'testing'; if (s !== status) { status = s; notes.push(`${H(t)}h ${s} (${sc.hits}/${sc.falses}/${sc.misses})`); if (!firstJudge && s !== 'testing') firstJudge = { at: H(t), s }; } };
 let alarm: any = null, mark = 0; const resid: number[] = [];
 for (let i = 0; i < reads.length; i++) {
   const t = reads[i].t;
   // settle alarms and storms as hypoTick
-  if (h3 && alarm && t - alarm.at > DAY) { if (!alarm.matched) { sc.falses++; mark = Math.max(mark, alarm.mark + 2); judge(t); } alarm = null; }
+  if (h3 && alarm && t - alarm.at > DAY) { if (!alarm.matched) { sc.falses++; first ??= { at: H(t), what: "false" }; mark = Math.max(mark, alarm.mark + 2); judge(t); } alarm = null; }
   for (const s of SS) if (h3 && s.at >= h3.at) {
     if (!s.seen && t >= s.at) { s.seen = true; if (alarm && !alarm.matched && s.at - alarm.at <= DAY) { s.caught = true; alarm.matched = true; sc.leads.push(Math.round((s.at - alarm.at) / 3.6e6 * ISLAND_RATE)); } }
-    if (!s.settled && s.end !== undefined && t - s.end > DAY) { s.settled = true; if (s.caught) sc.hits++; else sc.misses++; judge(t); } }
+    if (!s.settled && s.end !== undefined && t - s.end > DAY) { s.settled = true; if (s.caught) sc.hits++; else sc.misses++; first ??= { at: H(t), what: s.caught ? "hit" : "miss" }; judge(t); } }
   if (i > 0 && reads[i - 1].run === reads[i].run) { dm.push(reads[i].mark - reads[i - 1].mark); da.push(reads[i].air - reads[i - 1].air); }
   const j = ago(i); if (j < 0) continue;
   if (dm.length > 4) { let sxy = 0, sxx = 0; for (let n = 0; n < dm.length; n++) { sxy += dm[n] * da[n]; sxx += da[n] * da[n]; } k = sxx > 0 ? sxy / sxx : 0; }
@@ -63,7 +63,7 @@ for (let i = 0; i < reads.length; i++) {
 const per = storms.map((s) => { const e = s.end ?? T0 + END * 3.6e6, pre = reads.filter((r) => r.t >= s.at - DAY && r.t < s.at), dur = reads.filter((r) => r.t >= s.at && r.t <= e);
   const rises = (xs: typeof reads) => xs.filter((r, n) => n > 0 && r.mark > xs[n - 1].mark).length;
   return { at: H(s.at), end: H(e), preN: pre.length, preMax: pre.length ? Math.max(...pre.map((r) => r.mark)) : null, preRises: rises(pre), durN: dur.length, durMax: dur.length ? Math.max(...dur.map((r) => r.mark)) : null, durRises: rises(dur), dur2: dur.filter((r) => r.mark >= 2).length }; });
-const out = { placed: P, reads: reads.length, stops, storms: per, h3: h3 && { ...h3, at: H(h3.at), kFinal: +k.toFixed(2), markFinal: mark }, score: sc, status, firstJudge, notes, tail: reads.filter((r) => H(r.t) >= 674 && H(r.t) < 684).map((r) => [H(r.t), r.mark]) };
+const out = { placed: P, reads: reads.length, stops, storms: per, h3: h3 && { ...h3, at: H(h3.at), kFinal: +k.toFixed(2), markFinal: mark }, score: sc, status, firstJudge, first, notes, tail: reads.filter((r) => H(r.t) >= 674 && H(r.t) < 684).map((r) => [H(r.t), r.mark]) };
 console.log(JSON.stringify(out));
 if (process.env.OUT) fs.writeFileSync(process.env.OUT, JSON.stringify({ ...out, trace: reads.map((r) => [H(r.t), r.mark, r.air]) }));
 process.exit(0);
