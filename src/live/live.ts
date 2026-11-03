@@ -55,6 +55,8 @@ export interface LiveCtx {
   sun?(ms: number): { rise: number; set: number };
   /** A camera's timed sight in its time now, and the camera for it (main.ts: 07 the beach, or 13 above the island). */
   sight?(): { id: SightId; key: string; subj: any } | null;
+  /** How a timed sight ended — its time done, cut in on (by what), or never on air in its time (for the log: ?rehearsal). */
+  sightEnd?(id: string, how: 'done' | 'cut' | 'missed', why: string): void;
 }
 /** The drone's number for each one it follows (01–04; 13 the sky's, above the island). */
 const DORON: Record<string, string> = { dot: '01', rakko: '02', kame: '03', lantern: '04', sky: '13' };
@@ -241,7 +243,7 @@ export function makeLive(ctx: LiveCtx) {
     band.classList.toggle('dim', [cb, pb].some((b) => b?.place && !b.el.classList.contains('off') && overlaps(b.place, bandR)));
   }
 
-  const director = makeDirector({ residents: ctx.residents, watched: ctx.watched, watch: ctx.watch, cam: ctx.cam, speaking: () => talking, visible: ctx.visible, skip: ctx.skip, places: ctx.places, sight: ctx.sight });
+  const director = makeDirector({ residents: ctx.residents, watched: ctx.watched, watch: ctx.watch, cam: ctx.cam, speaking: () => talking, visible: ctx.visible, skip: ctx.skip, places: ctx.places, sight: ctx.sight, sightEnd: ctx.sightEnd });
   function update(dt: number) {
     const R = ctx.residents();
     if (!R) return;
@@ -366,7 +368,7 @@ export function makeLive(ctx: LiveCtx) {
     if (calm && now >= at && now - at < 5 * 60e3 && lines.length && once(`seaglass.today:${dayName()}`))
       queue.push({ head: en ? SIGHTS.today.en : SIGHTS.today.ja, text: lines.map((l) => `<span class="l">${l}</span>`).join(''), at, secs: TODAY_S, cue: 'sight', cls: 'today' });
     // (the top right: its heading, the time, the name — swapped over 0.6 s as it changes)
-    const n = ctx.sun ? nextSight(now, tz, ctx.sun, { calm, over: director.sightOver, on: on?.id ?? null, today: lines.length > 0 }) : null;
+    const n = ctx.sun ? nextSight(now, tz, ctx.sun, { calm, over: director.sightOver, aired: director.sightAired, on: on?.id ?? null, today: lines.length > 0 }) : null;
     const w = n ? nextWords(n, tz, en, localTimeString) : null;
     const html = w ? `<span class="k">${esc(w.k)}</span>${w.tm ? `<span class="tm">${w.tm}</span>` : ''}<span class="nm">${esc(w.name)}</span>` : '';
     if (html === nextShown) return;

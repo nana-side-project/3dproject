@@ -89,6 +89,7 @@ body.live #diaryBook, body.live #newMark, body.live #hoverTag, body.live #tapRin
 /* the day's card at 19:00 (TRIAL6.md §1-5): up to three facts, a line each, a step smaller */
 #live .card.today .what { font-size: var(--s4); line-height: 1.5; }
 #live .card.today .what .l { display: block; }
+#live .card.today .what .done { color: var(--done); }   /* (a stage of the way done: the chapter line's colour for done) */
 /* in English (?lang=en): the Latin face for the world's words; less spacing, which suits Mincho, not Garamond */
 #live.en .brand .ja, #live.en .when .date, #live.en .when .ai, #live.en .band .who .name, #live.en .band .status, #live.en .sub .who, #live.en .sub .tr,
 #live.en .card .head, #live.en .card .what, #live.en .card .at { font-family: var(--latin); letter-spacing: 0.01em; }

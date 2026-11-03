@@ -2,18 +2,22 @@
 // with a sight, cues.ts):
 //   times    the dawn the twenty minutes before the sun is up, the round from noon (it may begin until ten past), the sunset
 //            the thirty before it is down; none in a typhoon
-//   next     "このあと": later, まもなく ten minutes before, いま while on (no time); a round over for the day passed by; one on
-//            air past its window still いま; the day's card only on a day with something for it; the night's next "あすの
-//            朝", after midnight "このあと"; in a typhoon tomorrow's; the English words
-//   today    the day's card: one of each — a try's result (those that held first), a first's card, a stage of the way — then
-//            more in that order, three at most; a stage whose first had its card, once; nothing, no card; in English no
-//            try's words yet
+//   next     "このあと": later, まもなく ten minutes before; a camera's いま (no time) only once it has been on air — in its
+//            window but not yet on, still まもなく; a round over for the day passed by; one on air past its window still いま;
+//            the day's card only on a day with something for it; the night's next "あすの朝", after midnight "このあと"; in a
+//            typhoon tomorrow's; the English words
+//   today    the day's card: one of each — a try's result (those that held first), a first's card, a stage of the way (its
+//            word in the done colour) — then more in that order, three at most; a stage whose first had its card, once;
+//            nothing, no card; in English no try's words yet
 //   go       a sight in its time over one at work: its camera at once, held all its time (no turn); its time over: the next
 //   round    the round keeps its three minutes though its window lasts, then is over for the day
 //   rank 1   a moment decided cuts in on the sunset; after its twenty seconds, the sunset again (its time lasting); on the
 //            round: the round over, not gone back to
 //   rank 2   a talk cuts in on the sunset; the talk over, the sunset again
 //   wait     a line being said as a sight begins: let finish (ten seconds at most); a rank-1 moment held: waited for
+//   soft     one starting to think, or on its way to ask (not yet talking): no wait for it as the sight begins, no cut on it
+//            once on — a talk still cuts in (viewer design on #243)
+//   ends     told: the round's three minutes done, a sight cut in on (by what), a sight's time gone by never on air
 //   gather   a gathering while the beach's camera has the dawn: the house's wide shot
 //   bell     the sight's bell as strong as a gathering's knocks, and counted in the three minutes
 // Usage: npx tsx scripts/sights-check.ts
@@ -40,12 +44,12 @@ const day = new Date(MID + TZ * H).toISOString().slice(0, 10);
   const say = (ms: number, o: Parameters<typeof nextSight>[3], en = false) => { const n = nextSight(ms, TZ, sun, o); if (!n) return '-'; const w = nextWords(n, TZ, en, hhmm); return `${w.k} ${w.tm} ${w.name}`.replace(/\s+/g, ' ').trim(); };
   const c = { calm: true, today: false };
   const got = {
-    later: say(at(11, 30), c), soon: say(at(11, 52), c), now: say(at(12, 1), c),
+    later: say(at(11, 30), c), soon: say(at(11, 52), c), due: say(at(12, 1), c), now: say(at(12, 1), { ...c, aired: (k) => k === `round:${day}` }),
     over: say(at(12, 1), { ...c, over: (k) => k === `round:${day}` }), late: say(at(12, 12), { ...c, on: 'round' }),
     noCard: say(at(18, 58), c), card: say(at(18, 58), { ...c, today: true }), night: say(at(22, 0), c), small: say(at(2, 0), c),
     storm: say(at(10, 0), { ...c, calm: false }), en: say(at(22, 0), c, true), morning: say(at(8, 55), c),
   };
-  const want = { later: 'このあと 12:00 島めぐり', soon: 'まもなく 12:00 島めぐり', now: 'いま 島めぐり', over: 'このあと 17:06 夕日の浜', late: 'いま 島めぐり',
+  const want = { later: 'このあと 12:00 島めぐり', soon: 'まもなく 12:00 島めぐり', due: 'まもなく 12:00 島めぐり', now: 'いま 島めぐり', over: 'このあと 17:06 夕日の浜', late: 'いま 島めぐり',
     noCard: 'このあと 19:25 焚き火の会', card: 'まもなく 19:00 きょうの島', night: 'あすの朝 05:52 夜明けの浜', small: 'このあと 05:52 夜明けの浜',
     storm: 'あすの朝 05:52 夜明けの浜', en: 'Tomorrow morning 05:52 Dawn on the beach', morning: 'まもなく 09:00 朝の集まり' };
   const bad = Object.keys(want).filter((k) => (got as any)[k] !== (want as any)[k]);
@@ -63,7 +67,7 @@ const day = new Date(MID + TZ * H).toISOString().slice(0, 10);
   const ja = todayLines(rec, steps, false, esc), none = todayLines(emptyDay('d'), [], false, esc);
   const en = todayLines(rec, [{ w: 'hut', at: at(8), key: 'hut' }], true, esc, (k, n) => (k === 'raft' ? `${n}'s raft is built` : null));
   const more = todayLines({ ...rec, firsts: [] }, [], false, esc);
-  row(JSON.stringify(ja) === JSON.stringify(['カメマル　確かめた：藻場で海草が増えた', 'ドットの筏ができた', '道のり　小屋']) && none.length === 0 && JSON.stringify(en) === JSON.stringify(["ドット's raft is built", 'The way: hut'])
+  row(JSON.stringify(ja) === JSON.stringify(['カメマル　確かめた：藻場で海草が増えた', 'ドットの筏ができた', '道のり　<span class="done">小屋</span>']) && none.length === 0 && JSON.stringify(en) === JSON.stringify(["ドット's raft is built", 'The way: <span class="done">hut</span>'])
     && JSON.stringify(more) === JSON.stringify(['カメマル　確かめた：藻場で海草が増えた', 'ランタン　やりとげた：灯皿を焼く', 'ドット　違っていた：濡れた薪でも燃える']),
     `today: ${ja.join(' / ')}; nothing → ${none.length} lines; English → ${en.join(' / ')}; tries only → ${more.join(' / ')}`);
 }
@@ -76,8 +80,9 @@ type Cam = { t: number; who: string; pri: number; kind: string; why: string };
 function stage(list: any[], places: any[] = [{ subj: HOUSE, at: { lx: 0, lz: 0 } }]) {
   const R = { list, mind: () => null }, cams: Cam[] = [];
   let w: any = null, t = 0, sight: any = null, talk = false;
-  const D = makeDirector({ residents: () => R, watched: () => w, watch: (r) => { w = r; }, speaking: () => talk, cam: (who, pri, kind, why) => cams.push({ t, who, pri, kind, why }), places: () => places, sight: () => sight });
-  return { D, cams, on: () => w, t: () => t, sight: (s: any) => { sight = s; }, talk: (on: boolean) => { talk = on; },
+  const ends: string[] = [];
+  const D = makeDirector({ residents: () => R, watched: () => w, watch: (r) => { w = r; }, speaking: () => talk, cam: (who, pri, kind, why) => cams.push({ t, who, pri, kind, why }), places: () => places, sight: () => sight, sightEnd: (id, how, why) => ends.push(`${id} ${how} ${why}`) });
+  return { D, cams, ends, on: () => w, t: () => t, sight: (s: any) => { sight = s; }, talk: (on: boolean) => { talk = on; },
     run: (s: number) => { for (let i = 0; i < s * 10; i++) { t += 0.1; D.tick(0.1); } }, until: (f: () => boolean, s = 120) => { for (let i = 0; i < s * 10 && !f(); i++) { t += 0.1; D.tick(0.1); } } };
 }
 const DUSK = { id: 'dusk', key: `dusk:${day}`, subj: SKY('dusk') }, ROUND = { id: 'round', key: `round:${day}`, subj: SKY('round') };
@@ -128,6 +133,24 @@ const DUSK = { id: 'dusk', key: `dusk:${day}`, subj: SKY('dusk') }, ROUND = { id
   dot.task = { kind: 'fire', arrived: true }; dot.saying = 'こんばんは';   // (at the fire, speaking: the gathering)
   S.run(1);
   row(on === 'beach' && kind === 'sight' && S.on() === HOUSE && S.cams.at(-1)?.kind === 'gather', `gather: the dawn on ${on} (${kind}); a gathering → ${S.on()?.id} (${S.cams.at(-1)?.kind})`);
+}
+{ // soft
+  const dot = mk('dot', 'ponder', 60, 40), kame = mk('kame', 'graze', -200, 90), S = stage([dot, kame]);
+  S.run(5); const before = S.on()?.id, pri = S.cams.at(-1)?.pri;   // (Dot thinking: rank 1, held)
+  S.sight(DUSK); S.run(1); const went = S.on() === DUSK.subj;
+  kame.task = { kind: 'ponder', arrived: true }; S.run(5); const stayed1 = S.on() === DUSK.subj;   // (another starts to think)
+  dot.task = { kind: 'ask', arrived: false }; S.run(5); const stayed2 = S.on() === DUSK.subj;   // (one on its way to ask)
+  const tk = { a: dot, b: kame }; dot.talk = tk; kame.talk = tk; S.run(1); const cut = S.on()?.id;   // (talking: cuts in)
+  row(before === 'dot' && pri === 1 && went && stayed1 && stayed2 && (cut === 'dot' || cut === 'kame'),
+    `soft: on Dot thinking (rank ${pri}); the sunset's time → ${went ? 'the sunset at once' : S.on()?.id}; another starts to think → still on it ${stayed1}; one on its way to ask → still on it ${stayed2}; a talk → ${cut}`);
+}
+{ // ends
+  const S = stage([mk('dot', 'build', 60, 40), mk('kame', 'graze', -200, 90)]);
+  S.run(5); S.sight(ROUND); S.run(1); S.until(() => S.on() !== ROUND.subj, 400);
+  const kame = mk('kame', 'graze', -200, 90), dot = mk('dot', 'build', 60, 40), K = stage([dot, kame]); K.run(5); K.sight(DUSK); K.run(5); K.D.trial(kame, 'confirmed', '藻場で食べた'); K.run(1);
+  const tk = { a: dot, b: kame }, M = stage([dot, kame]); dot.talk = tk; kame.talk = tk; M.run(5); M.sight(DUSK); M.run(60); M.sight(null); M.run(1); dot.talk = null; kame.talk = null;
+  row(S.ends.join() === 'round done 3分見せた' && K.ends.join() === 'dusk cut result:confirmed' && M.ends.join() === 'dusk missed 時刻のうちに出なかった',
+    `ends: the round ${S.ends.join(' / ')}; the sunset, a result → ${K.ends.join(' / ')}; the sunset's time all in a talk → ${M.ends.join(' / ')}`);
 }
 { // bell
   const played: Cue[] = [], log: string[] = [];

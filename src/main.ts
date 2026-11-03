@@ -299,8 +299,8 @@ function skyCamPose(kind: SightId, t: number, pts = skyPts()): Pose | null {
   const x = c.x - w.x * 20, z = c.z - w.z * 20;   // (a little behind the house from the sun: the island before it, then the sea)
   return { x, y: clear(x, z, c.y + SKY_HIGH), z, ang: Math.atan2(dz, dx), off: 0, el: 0, dist: 400, lx: x + dx * 400, ly: 2, lz: z + dz * 400 };
 }
-/** Whether the beach's camera has the western sky in its picture (the sunset's, TRIAL6.md §1-1): it looks within 50° of
- *  the way to the setting sun. */
+/** Whether the beach's camera has the sun's side of the sky in its picture — the west at the sunset (TRIAL6.md §1-1), the
+ *  east at the dawn (viewer design on #243): it looks within 50° of the way to the sun. */
 function beachSeesSun(): boolean {
   const p = fixedCams.at.beach; if (!p) return false;
   const w = sunWay(), lx = p.lx - p.x, lz = p.lz - p.z;
@@ -314,14 +314,13 @@ function sunOf(ms: number) {
   if (!s) { const e = sunEvents(mid + 12 * 3.6e6, cur.loc); s = { rise: e.rise, set: e.set }; if (sunDays.size > 8) sunDays.clear(); sunDays.set(k, s); }
   return s;
 }
-/** The camera's timed sight in its time now and the camera for it (TRIAL6.md §1-1): the dawn on the beach's camera (07),
- *  from above the island (13) while there is none; the sunset on the beach's or from above, whichever has the western
- *  sky; the island round from above. */
+/** The camera's timed sight in its time now and the camera for it (TRIAL6.md §1-1): the dawn and the sunset on the
+ *  beach's camera (07) when it looks to the sun, else from above the island (13); the island round from above. */
 function sightCam(): { id: SightId; key: string; subj: any } | null {
   const R: any = cur?.residents; if (!R || !cur?.T) return null;
   const s = sightNow(clock.ms, cur.loc.tz ?? 9, sunOf, calmOf(R)); if (!s) return null;
   const beach = placesNow().includes('beach');
-  const subj = s.id === 'round' ? SKY_SUBJ.round : s.id === 'dawn' ? (beach ? PLACE_SUBJ.beach : SKY_SUBJ.dawn) : beach && beachSeesSun() ? PLACE_SUBJ.beach : SKY_SUBJ.dusk;
+  const subj = s.id === 'round' ? SKY_SUBJ.round : beach && beachSeesSun() ? PLACE_SUBJ.beach : SKY_SUBJ[s.id];   // (the beach's, the dawn's as the sunset's, only looking to the sun: viewer design on #243)
   if ('sky' in subj && !skyPts().length) return null;   // (nowhere for the sky's camera to look: no sight rather than one not put on)
   return { ...s, subj };
 }
@@ -4019,7 +4018,7 @@ if (live && (!location.hash || location.hash === '#')) history.replaceState(null
 if (live) import('./live/live').then((m) => { liveUi = m.makeLive({ residents: () => (mode === 'ocean' ? cur?.residents ?? null : null), watched: () => fleet.bridge?.to ?? (watch.sky ? SKY_SUBJ[watch.sky] : watch.place ? PLACE_SUBJ[watch.place] : watch.r), watch: (r) => fleetCut(r), clockMs: () => clock.ms, tz: () => cur?.loc.tz ?? 9, cam: (who, pri, kind, why) => rehearsal?.cam(who, pri, kind, why),
   visible: (r) => (r?.place || r?.sky ? true : fleetSees(r)), skip: (who, pri, why) => rehearsal?.event('cam-skip', `${DORON[who] ?? '13'} ${who} ${why}`, false), bridging: () => !!fleet.bridge,
   cue: (c) => cue(c), speaking: () => speaking(), cueLog: (c, sounded, why) => rehearsal?.event('cue', sounded ? c : `${c}（鳴らさず：${why}）`, sounded),
-  headAt: (r, sight) => headAt(r, sight), sayLog: (mode, who, why) => rehearsal?.event('say', `${mode} ${who}${why ? ` ${why}` : ''}`, false), places: () => placesNow().map((id) => ({ subj: PLACE_SUBJ[id], at: fixedCams.at[id]! })), sun: (ms) => sunOf(ms), sight: () => sightCam(),
+  headAt: (r, sight) => headAt(r, sight), sayLog: (mode, who, why) => rehearsal?.event('say', `${mode} ${who}${why ? ` ${why}` : ''}`, false), places: () => placesNow().map((id) => ({ subj: PLACE_SUBJ[id], at: fixedCams.at[id]! })), sun: (ms) => sunOf(ms), sight: () => sightCam(), sightEnd: (id, how, why) => rehearsal?.event('sight-end', `${id} ${how}${why ? ` ${why}` : ''}`, false),
   placeState: (id) => { const w = placeWorld(); return w && { built: w.R.list.find((x: any) => x.id === 'dot')?.stats?.built ?? 0, roofN: w.pl.roofN, hutN: w.pl.hutN,
     raft: { parts: w.v.raft.parts ?? 0, n: w.pl.raftN, away: w.R.list.some((x: any) => x.task?.kind === 'voyage' && x.task.data?.started) }, firing: w.firing, boiling: w.boiling, drying: false, lit: w.lit }; } }); });
 // Where a resident's head is on the screen, for the speech bubble (BUBBLE.md §2–3; src/live/bubble.ts): the point 12 cm

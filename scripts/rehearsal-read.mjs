@@ -107,6 +107,10 @@ if (cams.length) {
   const sightOn = cams.filter((c) => c.kind === 'sight'), sightK = {};
   for (const c of sightOn) { const k = `${String(c.why).split('：')[1] ?? '?'} ${DORON[c.who] ?? '13'}`; sightK[k] = (sightK[k] ?? 0) + 1; }
   if (sightOn.length) console.log(`the timed sights on air: ${sightOn.length} — ${Object.entries(sightK).map(([k, n]) => `${k} ×${n}`).join(', ')}`);
+  // (how each ended — its time done, cut in on and by what, never on air in its time: viewer design on #243)
+  const ends = rows.filter((r) => r.t === 'event' && r.kind === 'sight-end').map((r) => String(r.text)), endK = {};
+  for (const t of ends) endK[t] = (endK[t] ?? 0) + 1;
+  if (ends.length) console.log(`the timed sights ended: ${Object.entries(endK).map(([k, n]) => `${k} ×${n}`).join(', ')}`);
   console.log(`the cameras: ${Object.keys(byCam).sort().map((k) => `${k} ${(byCam[k] / 60e3).toFixed(1)} min (${Math.round(byCam[k] / camTotal * 100)}%)`).join(', ')}`);
   console.log(`  shots ${shots.length}, ${(shots.length / hours).toFixed(1)} an hour; a shot on average: day ${avg(lens.day)}, night ${avg(lens.night)}; through the sky ${skies}; to another side, hidden ${sides}; passed over, not seen ${skips} (${Math.round(skips / Math.max(1, skips + shots.length) * 100)}% of the choices)`);
   const results = rows.filter((r) => r.t === 'trial' && r.kind === 'result' && r.result !== 'steps-done');   // (§7-2: steps-done is not counted)

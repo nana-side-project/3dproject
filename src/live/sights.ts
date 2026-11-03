@@ -68,17 +68,19 @@ export function sightNow(ms: number, tz: number, sunOf: SunOf, calm: boolean): {
 
 export interface Next { id: SightId; at: number; state: 'later' | 'soon' | 'now'; tomorrow: boolean }
 /** The top right's "このあと" (PROGRAM.md §3, TRIAL6.md §1-4): the next sight, always one — "まもなく" from ten minutes
- *  before, "いま" while it is on (a camera's: in its window or on air), the night's next as "あすの朝". Not today's in a
- *  typhoon (tomorrow's are shown as they would be: the world decides), not a camera's over for the day (the round cut in
- *  on), not the day's card on a day with nothing for it. */
-export function nextSight(ms: number, tz: number, sunOf: SunOf, o: { calm: boolean; over?: (key: string) => boolean; on?: SightId | null; today?: boolean }): Next | null {
+ *  before, "いま" while it is on; a camera's "いま" only once it has been on air (until then "まもなく", its time still
+ *  shown — waiting for a talk to end, the screen is not the sight's: viewer design on #243), and so on while it waits to
+ *  come back; the night's next as "あすの朝". Not today's in a typhoon (tomorrow's are shown as they would be: the world
+ *  decides), not a camera's over for the day (the round cut in on), not the day's card on a day with nothing for it. */
+export function nextSight(ms: number, tz: number, sunOf: SunOf, o: { calm: boolean; over?: (key: string) => boolean; on?: SightId | null; aired?: (key: string) => boolean; today?: boolean }): Next | null {
   for (const d of [0, 1]) {
     const mid = dayStart(ms, tz) + d * DAY, t = sightTimes(mid, sunOf(mid + 12 * H)), day = dayKey(mid, tz);
     for (const id of SIGHT_ORDER) {
       if (d === 0 && (!o.calm || (id === 'today' && !o.today) || o.over?.(`${id}:${day}`))) continue;
       const [a, b] = SIGHTS[id].cam ? camWindow(id, t[id]) : t[id], on = d === 0 && o.on === id;
       if (!on && ms >= b) continue;
-      return { id, at: t[id][0], state: on || ms >= a ? 'now' : a - ms <= SOON_MIN * MIN ? 'soon' : 'later', tomorrow: d === 1 };
+      const begun = on || (SIGHTS[id].cam ? d === 0 && !!o.aired?.(`${id}:${day}`) : ms >= a);
+      return { id, at: t[id][0], state: begun ? 'now' : a - ms <= SOON_MIN * MIN ? 'soon' : 'later', tomorrow: d === 1 };
     }
   }
   return null;
@@ -107,7 +109,7 @@ export function todayLines(rec: DayRec, steps: { w: string; at: number; key: str
   const results = en ? [] : rec.results.slice().sort((a, b) => Number(b.held) - Number(a.held) || a.at - b.at).map((x) => esc(`${x.name}　${x.head}：${x.words}`));
   const firsts = rec.firsts.slice().sort((a, b) => a.at - b.at).map((x) => (en ? firstEn?.(x.key, x.name) ?? null : esc(x.text))).filter((x): x is string => !!x);
   const carded = new Set(rec.firsts.map((x) => x.key));
-  const ways = steps.filter((x) => !carded.has(x.key)).sort((a, b) => a.at - b.at).map((x) => esc(en ? `The way: ${x.w}` : `道のり　${x.w}`));
+  const ways = steps.filter((x) => !carded.has(x.key)).sort((a, b) => a.at - b.at).map((x) => `${esc(en ? 'The way: ' : '道のり　')}<span class="done">${esc(x.w)}</span>`);   // (the stage done in the chapter line's own colour for done: viewer design on #243)
   const lists = [results, firsts, ways], out: string[] = [];
   for (let k = 0; out.length < TODAY_MAX && lists.some((l) => l.length > k); k++) for (const l of lists) if (l[k] !== undefined && out.length < TODAY_MAX) out.push(l[k]);
   return out;
