@@ -55,8 +55,11 @@ const bad = (what: string) => { fail++; if (fail < 20) console.log('  ✗', what
   // (and back: the same answers as before the change)
   if (listFrom(ISLAND_EPOCH, 3).join() !== old.join()) bad('a new island: back on the first, its nights changed');
   if (fresh[0] !== '2027-05-22') bad(`a new island begun 11/12 0:00: first night ${fresh[0]} (science: 2027-05-22)`);
+  // (the trials' and December's islands, each begun at 8:00 (#233): their first nights, as the main side worked out)
+  const trials: [string, string][] = [['2026-11-12T08:00:00+09:00', '2027-06-20'], ['2026-11-19T08:00:00+09:00', '2027-10-17'], ['2026-12-05T08:00:00+09:00', '2027-02-23']];
+  const firsts = trials.map(([at, want]) => { const got = listFrom(Date.parse(at), 1)[0]; if (got !== want) bad(`an island begun ${at}: first night ${got} (want ${want})`); return `${at.slice(5, 10)} → ${got}`; });
   setIslandEpoch(ISLAND_EPOCH);
-  console.log(`a new island: begun 10/5 — ${old.join(', ')}; begun 11/12 0:00 — ${fresh.join(', ')}`);
+  console.log(`a new island: begun 10/5 — ${old.join(', ')}; begun 11/12 0:00 — ${fresh.join(', ')}; begun at 8:00 — ${firsts.join(', ')}`);
 }
 // the Earth
 {
