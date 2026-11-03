@@ -5,10 +5,11 @@
 //   D leaves on the way: a little (under 3 m), seen and counted; much, not seen (leaves)
 //   E nothing seen from any side (shut in by trunks all round): no camera — not chosen
 //   F the sky between two places: high above the way, looking to where it goes
-//   G for two seconds after a cut, nothing is out of sight (nothing put down or taken away: eco/unseen.ts), then as before
+//   G for two seconds after a cut, nothing is out of sight and there is no "behind the camera" to put one (eco/unseen.ts:
+//     unseen, behind), then as before
 // Usage: npx tsx --import ./scripts/node-assets.mjs scripts/fleet-check.ts
 import { poseFor, sightOf, camFor, skyPose, OFF, LEAVES_MAX, type Solid } from '../src/live/fleet';
-import { unseen, holdUnseen } from '../src/eco/unseen';
+import { unseen, behind, holdUnseen } from '../src/eco/unseen';
 
 let bad = 0;
 const want = (what: string, ok: boolean, got = '') => { if (!ok) bad++; console.log(`${what}: ${got} ${ok ? 'ok' : 'FAIL'}`); };
@@ -48,10 +49,12 @@ const dot = { id: 'dot', pos: { x: 0, y: 1, z: 0 }, head: 0, sp: { living: false
 }
 { // G
   let t = 1000; const real = performance.now; (performance as any).now = () => t;
-  const oc = { loc: { water: { fog: 0.02 } } }, far = () => unseen(oc, 0, -3, -60, { x: 0, y: -3, z: 0 }, 0, 1);   // (60 m dead behind)
-  const before = far(); holdUnseen(2000); t += 1900; const during = far(); t += 200; const after = far();
+  const oc = { loc: { water: { fog: 0.02 }, pelagic: true }, T: { top: () => -20 } }, far = () => unseen(oc, 0, -3, -60, { x: 0, y: -3, z: 0 }, 0, 1);   // (60 m dead behind)
+  const back = () => behind(oc, { x: 0, z: 0 }, 0, 1, 40, 2);
+  const before = far(), bBefore = back(); holdUnseen(2000); t += 1900; const during = far(), bDuring = back(); t += 200; const after = far(), bAfter = back();
   (performance as any).now = real;
-  want('G two seconds after a cut: nothing out of sight; then as before', before && !during && after, `${before} → ${during} → ${after}`);
+  want('G two seconds after a cut: nothing out of sight, nowhere behind the camera; then as before', before && !during && after && !!bBefore && bDuring === null && !!bAfter,
+    `unseen ${before} → ${during} → ${after}; behind ${!!bBefore} → ${bDuring} → ${!!bAfter}`);
 }
 console.log(bad ? `FAIL (${bad})` : 'all ok');
 process.exit(bad ? 1 : 0);

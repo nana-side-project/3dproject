@@ -36,6 +36,7 @@ export function unseen(oc: any, x: number, y: number, z: number, cam: { x: numbe
  *  behind; ±1: behind to one side), in water at least `need` deep: where something can be put unseen.
  *  Tries round the back first, then wider, then further off; null if there is no such water. */
 export function behind(oc: any, cam: { x: number; z: number }, fx: number, fz: number, d: number, need: number, off = 0) {
+  if (holdUntil > 0 && nowMs() < holdUntil) return null;   // (just after a cut: nowhere is behind the camera — science on #228)
   const back = Math.atan2(-fz, -fx), T = oc.T;
   for (let k = 0; k < 40; k++) {
     const spread = 0.35 + k * 0.03, a = back + off + (R() * 2 - 1) * spread, dd = d * (1 + Math.floor(k / 14) * 0.35);

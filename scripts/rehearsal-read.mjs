@@ -94,9 +94,10 @@ if (cams.length) {
   const byCam = {}, lens = { day: [], night: [] };
   shots.forEach((c, i) => { const end = i + 1 < shots.length ? ms(shots[i + 1]) : lastAt, len = until(ms(c), end), k = `${DORON[c.who] ?? '13'} ${c.who}`; byCam[k] = (byCam[k] ?? 0) + len; const h = new Date(ms(c) + 9 * 3600e3).getUTCHours(); (h >= 6 && h < 21 ? lens.day : lens.night).push(len); });
   const camTotal = Object.values(byCam).reduce((a, b) => a + b, 0) || 1, hours = until(ms(cams[0]), lastAt) / 3600e3 || 1, avg = (a) => (a.length ? `${(a.reduce((x, y) => x + y, 0) / a.length / 1e3).toFixed(0)} s (${a.length})` : '—');
-  const skips = rows.filter((r) => r.t === 'event' && r.kind === 'cam-skip').length, skies = rows.filter((r) => r.t === 'event' && r.kind === 'cam-sky').length;
+  const skips = rows.filter((r) => r.t === 'event' && r.kind === 'cam-skip').length, skies = rows.filter((r) => r.t === 'event' && r.kind === 'cam-sky' && !String(r.text).startsWith('→')).length;
+  const sides = rows.filter((r) => r.t === 'event' && r.kind === 'cam-side').length;   // (cut to another side of the one on air, hidden from where it was)
   console.log(`the cameras: ${Object.keys(byCam).sort().map((k) => `${k} ${(byCam[k] / 60e3).toFixed(1)} min (${Math.round(byCam[k] / camTotal * 100)}%)`).join(', ')}`);
-  console.log(`  shots ${shots.length}, ${(shots.length / hours).toFixed(1)} an hour; a shot on average: day ${avg(lens.day)}, night ${avg(lens.night)}; through the sky ${skies}; passed over, not seen ${skips} (${Math.round(skips / Math.max(1, skips + shots.length) * 100)}% of the choices)`);
+  console.log(`  shots ${shots.length}, ${(shots.length / hours).toFixed(1)} an hour; a shot on average: day ${avg(lens.day)}, night ${avg(lens.night)}; through the sky ${skies}; to another side, hidden ${sides}; passed over, not seen ${skips} (${Math.round(skips / Math.max(1, skips + shots.length) * 100)}% of the choices)`);
   const results = rows.filter((r) => r.t === 'trial' && r.kind === 'result' && r.result !== 'steps-done');   // (§7-2: steps-done is not counted)
   if (results.length) {
     const onAt = (t) => { let who = ''; for (const c of cams) { if (ms(c) > t) break; who = c.who; } return who; };
