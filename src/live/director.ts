@@ -8,6 +8,9 @@
 //   (4 the sea's shows and 5 looking back come with trial 4)
 //   storms (PROGRAM.md §4, D33): Kamemaru telling of a long swell is rank 1 (once a storm); Dot hauling the raft up in a
 //   hurry as a typhoon comes is rank 1 while it hauls
+// The drone fleet (ADR 0010, stage 1): what it chooses is a resident's camera (01–04), and one whose camera cannot see
+// its resident (visible: fleet.ts) is not chosen — a rank-1 moment waits for it while it is fresh; the one on air, hidden
+// a while, is left for one that can be seen. Each passed over so is told to skip() now and then (the trial's log).
 // A higher rank cuts in on a lower one, never on its own rank; a line being said is let finish, ten seconds at most. After
 // a rank-1 moment the drone stays twenty seconds; on one at rest twelve seconds at most, if any other has something going
 // on; on work three minutes, then the next one at work — one trying a goal of its own first. When all are at rest, each one
@@ -26,7 +29,10 @@ export interface DirectorCtx {
   watch(r: any): void;
   speaking(): boolean;   // (a line is up on the screen now)
   cam?(who: string, pri: number, kind: string, why: string): void;
+  visible?(r: any): boolean;   // (its camera sees it: fleet.ts — none given, all are)
+  skip?(who: string, pri: number, why: string): void;   // (passed over, its camera not seeing it: for the log)
 }
+const SKIP_EVERY = 60, HIDDEN_LEAVE = 3;
 
 export const awake = (r: any) => r.act !== 'sleep' && r.task?.kind !== 'sleep' && !(r.task?.kind === 'voyage' && r.task.data?.started);   // (asleep, or away at sea: not followed)
 
@@ -47,9 +53,17 @@ export function makeDirector(ctx: DirectorCtx) {
   const calls: { id: string; kind: string; why: string; at: number }[] = [];
   const call = (r: any, kind: string, why: string) => { if (r?.id && ORDER.includes(r.id)) { calls.push({ id: r.id, kind, why: why.slice(0, 80), at: clock }); if (calls.length > 12) calls.shift(); } };
   const ownGoal = (R: any, r: any) => { const g = R.mind?.(r)?.goal; return !!g && g.by !== 'habit'; };
+  // (its camera sees it; one passed over for not being seen, told now and then)
+  const skipped: Record<string, number> = {};
+  const can = (r: any, pri = 3) => {
+    if (!r || !ctx.visible || ctx.visible(r)) return true;
+    if (clock - (skipped[r.id] ?? -1e9) >= SKIP_EVERY) { skipped[r.id] = clock; ctx.skip?.(r.id, pri, 'hidden'); }
+    return false;
+  };
+  let hiddenFor = 0;
   function next(R: any) {
     const now = ctx.watched(), i = now ? ORDER.indexOf(now.id) : -1;
-    for (let k = 1; k <= ORDER.length; k++) { const r = R.list.find((x: any) => x.id === ORDER[(i + k) % ORDER.length]); if (r && awake(r)) return r; }
+    for (let k = 1; k <= ORDER.length; k++) { const r = R.list.find((x: any) => x.id === ORDER[(i + k) % ORDER.length]); if (r && awake(r) && (r === now || can(r))) return r; }
     return now ?? R.list.find((x: any) => x.id === 'dot');
   }
   function follow(n: any, pri: number, kind: string, why: string) {
@@ -61,6 +75,8 @@ export function makeDirector(ctx: DirectorCtx) {
   function direct(R: any) {
     const r = ctx.watched();
     if (!r) { const n = next(R); if (n) { const k = rank(R, n); follow(n, k.pri, k.kind, 'start'); } return; }
+    // (the one on air, its camera not seeing it a while: as if at rest, so another that can be seen is gone to)
+    hiddenFor = ctx.visible && !ctx.visible(r) ? hiddenFor + 0.5 : 0;
     if (shot.id !== r.id) shot = { id: r.id, pri: rank(R, r).pri, kind: rank(R, r).kind, since: clock, hold: 0 };   // (followed by another hand)
     const held = shot.hold > clock, cur = held ? { pri: 1, kind: shot.kind } : rank(R, r);
     // (rank 1: what has just happened, or one starting to think — the line being said let finish, ten seconds at most)
@@ -70,18 +86,18 @@ export function makeDirector(ctx: DirectorCtx) {
     const c = calls.find((x) => x.id !== r.id || !held);
     const p1 = c ? { r: R.list.find((x: any) => x.id === c.id), kind: c.kind, why: c.why, call: c } : thinking ? { r: thinking, kind: 'thinking', why: '考え始めた', call: null }
       : hauling ? { r: hauling, kind: 'storm', why: '台風が来て、急いで筏を引き上げている', call: null } : null;
-    if (p1?.r && p1.r !== r && awake(p1.r) && cur.pri > 1) {
+    if (p1?.r && p1.r !== r && awake(p1.r) && cur.pri > 1 && can(p1.r, 1)) {
       if (!ctx.speaking() || (p1.call ? clock - p1.call.at : 0) > LINE_WAIT) { if (p1.call) calls.splice(calls.indexOf(p1.call), 1); follow(p1.r, 1, p1.kind, p1.why); return; }
       return;   // (waiting for the line to end)
     }
     if (p1?.r === r && p1.call) { calls.splice(calls.indexOf(p1.call), 1); shot.hold = clock + P1_HOLD; shot.kind = p1.kind; shot.pri = 1; ctx.cam?.(r.id, 1, p1.kind, p1.why); return; }   // (on it already: it stays)
     if (held) return;
     // (rank 2 cuts in on 3 and 6: two at work together, talking, at the fire)
-    if (cur.pri > 2) { const t = live.find((x: any) => x !== r && rank(R, x).pri === 2); if (t) { const k = rank(R, t); follow(t, 2, k.kind, k.kind === 'talk' ? '話している' : k.kind === 'fire' ? '焚き火の会' : '頼み・知らせ'); return; } }
+    if (cur.pri > 2) { const t = live.find((x: any) => x !== r && rank(R, x).pri === 2 && can(x, 2)); if (t) { const k = rank(R, t); follow(t, 2, k.kind, k.kind === 'talk' ? '話している' : k.kind === 'fire' ? '焚き火の会' : '頼み・知らせ'); return; } }
     // (at rest: twelve seconds, if another has something going on; at work: three minutes — one trying a goal of its own first)
-    const best = () => live.filter((x: any) => x !== r && rank(R, x).pri <= 3).sort((a: any, b: any) => rank(R, a).pri - rank(R, b).pri || Number(ownGoal(R, b)) - Number(ownGoal(R, a)))[0];
-    if ((cur.pri === 6 && clock - shot.since >= REST_MAX) || (cur.pri === 3 && clock - shot.since >= WORK_TURN)) {
-      const b = best(); if (b) { const k = rank(R, b); follow(b, k.pri, k.kind, ownGoal(R, b) ? '試みの途中' : '仕事の途中'); return; }
+    const best = () => live.filter((x: any) => x !== r && rank(R, x).pri <= 3 && can(x)).sort((a: any, b: any) => rank(R, a).pri - rank(R, b).pri || Number(ownGoal(R, b)) - Number(ownGoal(R, a)))[0];
+    if ((cur.pri === 6 && clock - shot.since >= REST_MAX) || (cur.pri === 3 && clock - shot.since >= WORK_TURN) || hiddenFor >= HIDDEN_LEAVE) {
+      const b = best(); if (b) { const k = rank(R, b); follow(b, k.pri, k.kind, hiddenFor >= HIDDEN_LEAVE ? '見えなくなった' : ownGoal(R, b) ? '試みの途中' : '仕事の途中'); hiddenFor = 0; return; }
     }
     if (cur.pri !== shot.pri) ctx.cam?.(r.id, cur.pri, cur.kind, '同じ住人の、していることが変わった');   // (the same one, its rank changed: for the time each rank is on screen)
     if (cur.pri !== shot.pri || cur.kind !== shot.kind) { shot.pri = cur.pri; shot.kind = cur.kind; }
