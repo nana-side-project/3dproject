@@ -239,12 +239,12 @@ const fixedCams: { epoch: number; at: Partial<Record<PlaceId, Pose>>; t0: number
   try { const v = JSON.parse(localStorage.getItem(FIXED_KEY) || 'null'); if (v && v.epoch === islandEpoch()) return { epoch: v.epoch, at: v.at ?? {}, t0: performance.now(), on: [], onAt: 0 }; } catch (e) { /* none kept */ }
   return { epoch: islandEpoch(), at: {}, t0: performance.now(), on: [], onAt: 0 };
 })();
-const RUNS_ON = ['starting', 'running', 'needs-input'];
+// (a fire or a lamp is said to burn only while its run is running — not starting, not stopped waiting: science on #241)
 /** The world as the fixed cameras read it (residents' places(), village, lab): read only. */
 function placeWorld() {
   const R: any = cur?.residents; if (!R?.places || !cur?.T) return null;
-  const pl = R.places(), v = R.village, lab = R.lab, runs = (v?.labRuns ?? []).map((x: any) => lab?.runs?.[x.runId]).filter((x: any) => x && RUNS_ON.includes(x.status));
-  return { pl, v, R, firing: runs.some((x: any) => x.processId === 'p13y_pot_pit_fire'), boiling: runs.some((x: any) => x.processId === 'p31x_coconut_oil_boil'), lit: runs.some((x: any) => /lamp/.test(x.processId ?? '')),
+  const pl = R.places(), v = R.village, lab = R.lab, runs = (v?.labRuns ?? []).map((x: any) => lab?.runs?.[x.runId]).filter((x: any) => x?.status === 'running');
+  return { pl, v, R, firing: runs.some((x: any) => x.processId === 'p13y_pot_pit_fire'), boiling: runs.some((x: any) => x.processId === 'p31x_coconut_oil_boil'), lit: !!pl.lit,
     fired: (v?.fires ?? 0) > 0 || !!(v?.firsts && Object.keys(v.firsts).some((k: string) => /fire|pot|kiln|retort/.test(k))) };
 }
 /** The places with a camera now (looked at every few seconds). */

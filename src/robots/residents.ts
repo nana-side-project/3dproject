@@ -4282,7 +4282,8 @@ export function makeResidents(loc: any, T: any, fishNames: string[], birdNames: 
   // (where the island's things stand, for the live screen's fixed cameras — MULTICAM.md §1, stage 2: read only, a copy each
   // time; the picture's places are never fed back. The hut's place is known from the island's making, before it stands)
   (res as any).places = () => ({ hut: { x: hut.position.x, y: L.h(hut.position.x, hut.position.z), z: hut.position.z }, pit: { x: PIT.x, y: PIT.y, z: PIT.z },
-    plots: PLOTS.map((p) => ({ x: p.x, z: p.z, s: p.s })), hutN: HUT.length, roofN: 18, raftN: RAFT_N });
+    plots: PLOTS.map((p) => ({ x: p.x, z: p.z, s: p.s })), hutN: HUT.length, roofN: 18, raftN: RAFT_N,
+    lit: village.labRuns.some((x) => x.processId === 'p40x_oil_lamp' && lab.runs[x.runId]?.status === 'running') });   // (the lamp burning as lampTick draws its flame: science on #241)
   (res as any).meetAt = MEET_AT; (res as any).meets = (hr: number) => meetHours(hr);   // (whether the custom keeps at that hour today — the live screen's knock of wood: src/live/cues.ts)
   (res as any).patches = patches; (res as any).beds = beds;   // (for checks: robots/body.ts)
   let convN = 0;
