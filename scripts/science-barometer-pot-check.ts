@@ -350,8 +350,41 @@ console.log('7. the bamboo tube and the weather pot (p18x 0.1.0, p16x 0.1.5, tab
   const plunge = wgauge(2 * D, (t) => ({ p: 1010 - Math.min(70, (70 * t) / D), t: 28 }), every6h, H, 250_000, { tubeLengthMm: 200 });
   ok(plunge.last.released.some((r) => r.to === 'ground' && r.amount.value > 0) && plunge.obs.some((o) => /管の上から水があふれた|水があふれて減ったまま/.test(o.text ?? '')),
     'a deep low with a short tube: the water spills from the top (to the ground) and the weather pot says so', `${plunge.last.released.map((r) => r.amount.value).join(',')} mg`);
-  const high = wgauge(D, (t) => ({ p: 1010 + Math.min(20, (20 * t) / (6 * H)), t: 28 }), every6h);
-  ok(high.obs.some((o) => /外の空気が泡になって壺に入った|壺に空気が入ったまま/.test(o.text ?? '')), 'a high: the water is pushed down to the tube\'s end and outside air bubbles into the pot');
+  // 0.3.0: the weather pot's bottom lets air in and the pot goes on (science 2026-11-02, weather-pot-spill.md addendum)
+  const highEnv = (t: number): Env => ({ p: 1010 + Math.min(20, (20 * t) / (6 * H)), t: 28 });
+  const high = wgauge(2 * D, highEnv, every6h);
+  const hd = high.last.state.data as { condition: string; bubbles: number }, said = high.obs.filter((o) => o.text === '管の下から泡が上がった（壺はそのまま）');
+  ok(said.length >= 1 && !high.obs.some((o) => /外の空気が泡になって壺に入った|壺に空気が入ったまま/.test(o.text ?? '')) && hd.bubbles > 0 && high.marks.length === 8,
+    'a high: the water is pushed down to the tube\'s end, outside air bubbles into the pot, and the pot goes on (read at every read; never the words that call for setting it again)',
+    `${hd.bubbles} cells bubbled, said ${said.length}×, marks ${high.marks.join(', ')}`);
+  ok(said.every((o, i) => i === 0 || o.at - said[i - 1].at >= D) && high.last.status === 'completed' && high.last.produced.find((p) => p.materialId === 'process_water')?.amount.value === 250_000 && high.last.released.length === 0,
+    'the bubbles are said once an island day at most; the water comes back whole (air came in, no water went out)', said.map((o) => (o.at / H).toFixed(1)).join(' / '));
+  ok(high.marks.every((m) => m >= Math.floor(-0.0228 / 0.005) - 1) && high.marks[high.marks.length - 1] > high.marks[1],
+    'held at the tube\'s end while the high builds (about −23 mm), then the leak brings it back toward the mark as the pressure holds', high.marks.join(', '));
+  // the bubbled air, against an independent reference: a still pot at 28 °C stepped each second, the water never below −dip
+  { const pb2 = bulb(warmWell).params as Record<string, number>;
+    const one = wgauge(6 * H, highEnv, [6 * H - 2000]), od = one.last.state.data as { g: { V0: number; A: number; headK: number; bottomM: number }; s: { sLo: number } };
+    const g2 = od.g, kk2 = g2.headK * 1000 * pv('gravity'), T0b = 301.15, alpha2 = (pb2.capacityMl * 1e-6) / (T0b * pb2.airLeakTauMin * 60);
+    const xOf2 = (sv: number, P: number) => { const a = kk2 * g2.A, b = P * g2.A + kk2 * g2.V0, c = P * g2.V0 - sv * T0b; return (-2 * c) / (b + Math.sqrt(b * b - 4 * a * c)); };
+    let sv = (101000 * g2.V0) / T0b;
+    for (let t = 0; t < 6 * H - 2000; t += 1000) {
+      const P = (1010 + Math.min(20, (20 * Math.floor(t / H) * H) / (6 * H))) * 100;
+      if (xOf2(sv, P) < -g2.bottomM) sv = ((P - kk2 * g2.bottomM) * (g2.V0 - g2.A * g2.bottomM)) / T0b;
+      sv += -alpha2 * kk2 * xOf2(sv, P);
+    }
+    const P6 = (1010 + Math.min(20, (20 * 5 * H) / (6 * H))) * 100;
+    ok(one.marks.length === 1 && Math.abs(one.marks[0] - Math.round(xOf2(sv, P6) / 0.005)) <= 1, 'the air that bubbled in, as an independent one-second reference (the water held at the tube\'s end)', `${one.marks[0]} vs ${Math.round(xOf2(sv, P6) / 0.005)}`); }
+  // pressure unknown for hours in a rising high: the air that may have come in widens the bounds, never stops the pot;
+  // the known control's air stays inside them, and they close in again as each bound leaks on its own (0.3.0)
+  { const gapHigh = (t: number): Env => (t >= 2 * H && t < 5 * H ? { t: 28 } : highEnv(t));
+    const gh = wgauge(D, gapHigh, every6h), ctl = wgauge(D, highEnv, every6h);
+    const sOf = (r: ScienceStepResult) => (r.state.data as { s: { sLo: number; sHi: number } }).s, cond = (gh.last.state.data as { condition: string }).condition;
+    // (inside the gap the air is settled only when the pressure comes back: the bounds are checked on the hours it is known)
+    const inside = gh.all.every((r, i) => (i >= 2 && i < 5) || (() => { const b = sOf(r), c = sOf(ctl.all[i]).sLo; return c >= b.sLo * (1 - 1e-12) && c <= b.sHi * (1 + 1e-12); })());
+    const w = gh.all.map((r) => sOf(r).sHi - sOf(r).sLo);
+    ok(cond === 'ok' && inside && w[w.length - 1] < w[6] && w[6] > 0, 'a pressure gap in a rising high: bubbles may have come in — the bounds widen, the known control stays inside them, they close in again, the pot is never stopped',
+      `width after the gap ${w[6].toExponential(2)} → ${w[w.length - 1].toExponential(2)}; marks ${gh.marks.join(', ') || '(none: not yet one mark wide)'}`); }
+  refused('a /4 state (0.2.2) is refused under 0.3.0: the host sets the pot again', step(wreq(0, H, storm(0), { schema: 'civ-sci.air-barometer-pot/4', data: {} }, [])), /pot\/4|schema/);
   const setFail = (name: string, waterMg: number, eqo: Record<string, number>, why: RegExp) => refused(name, step(wreq(0, H, storm(0), null, [], waterMg, eqo)), why);
   setFail('too little water: the tube\'s end must stand in it', 60_000, {}, /too little water/);
   setFail('too much water: air must stay above it', 400_000, {}, /too much water/);

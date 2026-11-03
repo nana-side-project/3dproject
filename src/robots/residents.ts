@@ -24,7 +24,7 @@ import { mulberry32 } from '../core/math';
 import { BODY as NEEDS, PREY_JA, FILLS, drain, makePatch, regrow, regrowBed, dive, bodyState, trouble, newDay, type Patch, type Bed, type BodyState, type Trouble, type Prey } from './body';
 import { VOICES, STAGES, type Voice } from './voices';
 import { glyphs, kana, subtitle, type Count, type Said, type Tok } from './islandlang';
-import { islandDate, islandWait, islandWeather, ISLAND_RATE, type IslandWeather } from '../world/island-time';
+import { islandDate, islandWait, islandWeather, ISLAND_RATE, ISLAND_EPOCH, islandEpoch, setIslandEpoch, type IslandWeather } from '../world/island-time';
 import type { EnvironmentSample, LotView } from '../world/science-contract';
 import { wickQuality } from '../science/step/oil-lamp';
 import { compactScienceLedger, recentScienceRuns } from '../world/science-records';
@@ -3816,7 +3816,7 @@ export function makeResidents(loc: any, T: any, fishNames: string[], birdNames: 
       localStorage.setItem(saveKey, JSON.stringify({
         ...(study ? { lanternStudy: study.serialize() } : {}),
         minds: Object.fromEntries(Object.entries(agents).map(([id, a]) => [id, a.save()])),
-        at: Date.now(), clockMs, visited: [...visited], cairns: cairnSpots, bonds, talks: talks.slice(-160), items: items.save(), patches, beds, trees: TREES.map((t) => (t.down ? 1 : 0)), plots: PLOTS.map((pl) => [pl.s, pl.at]), village, lab, lastFireAt, drift: drift.kind >= 0 ? drift : null,
+        at: Date.now(), clockMs, islandEpoch: islandEpoch(), visited: [...visited], cairns: cairnSpots, bonds, talks: talks.slice(-160), items: items.save(), patches, beds, trees: TREES.map((t) => (t.down ? 1 : 0)), plots: PLOTS.map((pl) => [pl.s, pl.at]), village, lab, lastFireAt, drift: drift.kind >= 0 ? drift : null,
         list: list.map((r) => ({ id: r.id, pos: [r.pos.x, r.pos.z], head: r.head, battery: r.battery, hunger: r.hunger, sleepy: r.sleepy, body: r.body, stats: r.stats, today: r.today, diary: r.diary.slice(-800), holding: r.holding, photos: r.photos?.slice(-40), dayBase: r.dayBase, wear: r.wear, wearLv: r.wearLv, stuck: r.stuck })),
       }));
     } catch (e) { /* storage full or blocked: they live on in memory */ }
@@ -3830,6 +3830,9 @@ export function makeResidents(loc: any, T: any, fishNames: string[], birdNames: 
     if (Array.isArray(s?.patches) && s.patches.length) patches.splice(0, patches.length, ...s.patches);
     if (Array.isArray(s?.beds) && s.beds.length) beds.splice(0, beds.length, ...s.beds);
     for (const it of [...items.list]) if (!clearOf(it.x, it.z, L.h(it.x, it.z))) items.take(it);   // (one left inside a rock by an older island: gone)
+    // (the island's own calendar: a new island keeps the start it was given — the moment it began, set before it was
+    // made (main.ts ?newisland) — and an island saved before islands had their own keeps the first one's)
+    if (s) setIslandEpoch(s.islandEpoch > 0 ? s.islandEpoch : ISLAND_EPOCH);
     if (!s) return 0;
     if (study) { study.dispose(); study = createLanternStudy(s.lanternStudy, requestLanternDecision); }
     for (const [id, m] of Object.entries(s.minds || {})) agents[id]?.load(m);

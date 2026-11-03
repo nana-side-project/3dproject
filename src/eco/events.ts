@@ -15,7 +15,8 @@ import { MANTA_GEO, mantaMaterial, WHALE_GEO, whaleMaterial, SHAPES, fishGeometr
 import { mat } from '../render/common';
 import { SEA_REACH } from '../render/sea-reach';
 import type { Env, Subject } from './env';
-import { waterTopAt } from '../ocean/air';   // (the sea's still top: it rises and falls with the tide — ADR 0009)
+import { waterTopAt } from '../ocean/air';
+import { spawnWindow } from './spawn';   // (the sea's still top: it rises and falls with the tide — ADR 0009)
 
 export interface RareInfo { id: string; ja: string; note: string }
 // gone(): once its time is up, whether all of it has left the scene, out of sight (until then it goes on, leaving;
@@ -364,13 +365,17 @@ const KINDS: Kind[] = [
     },
   },
   {
-    info: { id: 'spawning', ja: 'サンゴの一斉産卵', note: '一年に一度、満月のあとの夜、リーフじゅうのサンゴがいっせいに卵と精子の小さな粒を放つ。ピンクや橙の粒が、雪が逆さに降るように水面へ昇っていく。' },
-    weight: (loc, env) => {
+    info: { id: 'spawning', ja: 'サンゴの一斉産卵', note: '一年に一度、初夏の満月のころの夜、日が沈んで1〜4時間のうちに、リーフじゅうのサンゴがいっせいに卵と精子の小さな粒を放つ。ピンクや橙の粒が、雪が逆さに降るように水面へ昇っていく。' },
+    weight: (loc, env, oc) => {
+      // Kayama: its one night of the year (eco/spawn.ts), all through that evening — and again now and then while it lasts
+      if (loc.id === 'kayama') return spawnWindow(env.ms, loc) && env.t >= (oc?.spawnNext ?? 0) ? 40 : 0;
       if (env.night < 0.6 || loc.pelagic) return 0;
-      const season: Record<string, number[]> = { gbr: [11, 12], miyako: [5, 6], kayama: [5, 6], maldives: [3, 4], redsea: [7, 8] };
+      const season: Record<string, number[]> = { gbr: [11, 12], miyako: [5, 6], maldives: [3, 4], redsea: [7, 8] };
       return inMonths(env.month, season[loc.id] || []) ? 4 : 0;
     },
     start(oc, env, cam) {
+      // (Kayama's night: once more, half an hour on, while the evening lasts — colony after colony lets go)
+      oc.spawnNext = env.t + 1800;
       // tens of thousands of little bundles rising from the reef around the camera
       const N = 14000, pos = new Float32Array(N * 3), sd = new Float32Array(N);
       for (let i = 0; i < N; i++) { const x = cam.x + rr(-25, 25), z = cam.z + rr(-25, 25); pos.set([x, oc.T.top(x, z) + R() * 0.3, z], i * 3); sd[i] = R(); }

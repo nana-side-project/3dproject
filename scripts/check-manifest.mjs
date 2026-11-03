@@ -18,7 +18,7 @@ const fast = [
   'manual-husk-work',
   'manual-husk-separation',
   'ai-pool', 'assembly', 'body', 'chapter1', 'chapter2', 'shelve', 'weather-pot', 'brain-weather', 'gauge-epoch', 'gauge-hypothesis', 'house', 'hypo', 'island-science', 'island-time', 'journal', 'tide', 'crabs', 'sea-level', 'tide-reach', 'husk-tide', 'no-way', 'residents-water',
-  'lamp',
+  'lamp', 'spawn',
   'lantern', 'lantern-brain', 'lantern-residents', 'lantern-sky', 'lantern-study',
   'lumau', 'map', 'mind', 'nav', 'pottery-host', 'process-runner',
   'science-barometer-pot', 'science-charcoal', 'science-clay-prep',

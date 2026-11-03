@@ -45,7 +45,7 @@ import { carpetSubjects } from './eco/carpetsharks';
 import { ageOf, describeSize } from './eco/growth';
 import { SHAPES } from './ocean/models';
 import { fetchWeather, FAIR, weatherLabel, isStorm, type Weather } from './time/weather';
-import { islandDate, islandWait, islandWeather, loadIslandWeather, type IslandWeather } from './world/island-time';
+import { islandDate, islandWait, islandWeather, loadIslandWeather, islandEpoch, setIslandEpoch, type IslandWeather } from './world/island-time';
 import { Post, setRTSupport, setMaxSamples } from './render/post';
 import { loadLand, forgetLand } from './ocean/land';
 import { STAGES } from './robots/voices';
@@ -81,6 +81,19 @@ const noPost = /[?&]nopost/.test(location.search), noPip = /[?&]nopip/.test(loca
 // ?live: the 24-hour stream (src/live/live.ts): straight into the island, the app's own controls put away, the drone
 // following each resident in turn, the observation window over it; the island on its own clock (now, as it is)
 const live = /[?&]live\b/.test(location.search);
+// A new island (D36/D37: the trials on a new island and December's): ?newisland=<today's date, JST, YYYY-MM-DD> — before the
+// island is made, the one kept in this browser is put away (written out first by hand: seaglassRehearsal.saveOut(),
+// docs/rehearsal/RUNBOOK.md) and the island's calendar starts now, on island June 1st of year 1. Only on the day it names, so
+// an old link opened again does nothing; taken off the address once done, so a reload goes on with the new island.
+const newIslandAt = (() => {
+  const want = new URLSearchParams(location.search).get('newisland'), today = new Date(Date.now() + 9 * 3.6e6).toISOString().slice(0, 10);
+  if (!want) return 0;
+  const q = new URLSearchParams(location.search); q.delete('newisland');
+  history.replaceState(null, '', `${location.pathname}${q.toString() ? `?${q.toString().replace(/=(&|$)/g, '$1')}` : ''}${location.hash}`);
+  if (want !== today) { console.warn(`newisland=${want}: not today (${today}) — nothing done`); return 0; }
+  try { localStorage.removeItem('seaglass.residents.v1'); } catch (e) { return 0; }
+  const at = Date.now(); setIslandEpoch(at); return at;
+})();
 let liveUi: { update(dt: number): void; sample(canvas: HTMLCanvasElement): void; haze(): Record<string, number>; event(kind: string, text: string, r: any, meta?: { milestone?: string }): void } | null = null;
 const SAFE = (() => { try { return +(sessionStorage.getItem('seaglass.safe') || 0); } catch (e) { return 0; } })();
 let lostCount = 0;
@@ -2489,6 +2502,8 @@ if (/[?&]rehearsal\b/.test(location.search)) rehearsal = startRehearsalLog({
   status: () => { const b = document.querySelector('#live .band'); return b && !b.classList.contains('off') ? `${b.querySelector('.name')?.textContent ?? ''}：${b.querySelector('.status')?.textContent ?? ''}` : ''; },
   audio: () => audioState(),
 });
+// (the island's calendar in the log: which island it is — cut-clips.ts dates its clips by it)
+rehearsal?.event('island-epoch', `${new Date(islandEpoch()).toISOString()}${newIslandAt ? ' new island' : ''}`, false);
 // The live stream starts with its sound on (PROGRAM.md §5-5): no button, no notice on the picture. At a fixed level, not
 // a viewer's saved one, with every voice; brought up from silence over 8 s. The browser is started to allow sound
 // without a click (--autoplay-policy=no-user-gesture-required, docs/rehearsal/WINDOWS.md); if it holds the sound all

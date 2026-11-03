@@ -34,18 +34,28 @@
 // reads exactly as 0.1.2.
 // Not modelled (as m02x): the water evaporating from the open leg, water vapour in the bulb, capillarity, wind on the
 // open leg, the tube's expansion; the pot changing in use (tar softening: the gauge stands in shade).
+// 0.3.0 (science 2026-11-02, weather-pot-spill.md addendum; main accepted on #222): the weather pot's water falling to
+// the tube's end lets outside air bubble up into the pot, and that is all: the water stops at the end, the air that came
+// in stays (the leak takes it back out in time), and the gauge goes on. Measured on the island's record (30 days, four
+// starts), the weather pot went out on the first cold step nearly every day (an hour of the record is half an island
+// day: 2.4 °C colder or 8 hPa higher in one step takes the water past a 23 mm dip) and was set again ~20 times a month;
+// as a real pot does, it now goes on (readable 98 % of the time). The bubbles are said once an island day at most, in
+// words of their own (BUBBLED), never the words that tell the residents the pot must be set again. The top still spills
+// (water lost: the pot no longer holds what it was set with). The U-tube (form 1) is as before.
 
 import type { Observation, ScienceStepRequest, ScienceStepResult } from '../../world/science-contract';
 import { pv } from '../params';
 import { AIR_RANGE_C, SPILL_NOW, SPILLED, type Geometry } from './barometer';
 import { allFinite, stateShapeOk, checkCommon, contractExtras, failed, fingerprint, finite, isInt } from './common';
 
-export const BAROMETER_POT_PROCESS = { processId: 'm03x_air_barometer_pot', processVersion: '0.2.2' } as const; // 0.2.2: reads sample the same whole seconds as the spill scan (SB-C3); the U-tube's bottom lets outside air in; impossible pots, very short τ and broken states refused // 0.2.1: the leak's conductance from the empty pot's capacity, not the air left above the water (Codex BW-A1) // 0.2.0: the weather pot (tubeForm 2) // 0.1.2: reads on the held pressure (Codex FX-SB-A1)
+export const BAROMETER_POT_PROCESS = { processId: 'm03x_air_barometer_pot', processVersion: '0.3.0' } as const; // 0.3.0: the weather pot's bottom lets air bubble in and goes on // 0.2.2: reads sample the same whole seconds as the spill scan (SB-C3); the U-tube's bottom lets outside air in; impossible pots, very short τ and broken states refused // 0.2.1: the leak's conductance from the empty pot's capacity, not the air left above the water (Codex BW-A1) // 0.2.0: the weather pot (tubeForm 2) // 0.1.2: reads on the held pressure (Codex FX-SB-A1)
 // /2 since 0.1.1 (the cell keeps its own pressure; a pressure gap keeps its extremes): a /1 run is refused; the host cancels it
 // /4 since 0.2.1 (the stored leakK of a 0.2.0 weather pot was too small; /3 since 0.2.0: the geometry carries the head
 // factor and the two ends): older states are refused, never resumed under a relabelled version; the host cancels the run
-// and releases its reservation
-const SCHEMA = 'civ-sci.air-barometer-pot/4', EVAL = 'air-barometer-pot-eval/0.2.2';
+// and releases its reservation; /5 since 0.3.0 (the weather pot's bubbles: bubbles, lastBubbleAt, bubbleSaidAt; each bound of the air leaks at its own rate)
+const SCHEMA = 'civ-sci.air-barometer-pot/5', EVAL = 'air-barometer-pot-eval/0.3.0';
+/** Bubbles are said at most once in this long (island ms): a day of cold steps would otherwise say it every cell. */
+const BUBBLE_SAY_MS = 24 * 3_600_000;
 const BULB = 'assembled_pot';
 const CELL_MS = 30_000, MIN_TAU_MIN = 10;
 
@@ -62,6 +72,8 @@ interface PotGaugeData {
   waterFp: string; waterMg: number; waterLocation: string; spilledMg: number;
   s: Snap; ctl: Ctl; lastPaPa: number; lastPaAt: number; gapOpen: boolean; gapLoMinK: number; gapHiMaxK: number; gapSLo: number; gapSHi: number;
   condition: Condition; spilledAt: number; historyComplete: boolean;
+  /** The weather pot's bubbles (0.3.0): how many cells let air in, the last one's end, when they were last said. */
+  bubbles: number; lastBubbleAt: number; bubbleSaidAt: number;
 }
 
 /** The bulb's params from the assembled pot (table /5) and the stick main carved (markMm); the weather pot needs the
@@ -102,6 +114,12 @@ function riseOf(g: PotGeometry, sealed: number, PaPa: number, bulbK: number): nu
   return (-2 * c) / (b + Math.sqrt(b * b - 4 * a * c));
 }
 const WEATHER_SPILL_NOW = { top: '管の上から水があふれた', bottom: '管の下の端まで水が下がり、外の空気が泡になって壺に入った' };
+/** The weather pot's bottom (0.3.0): air came in, the pot goes on. Not the words that tell the pot must be set again. */
+const BUBBLED = '管の下から泡が上がった（壺はそのまま）';
+/** The air a gauge holds with its water at x (the inverse of riseOf). */
+function airAt(g: PotGeometry, x: number, PaPa: number, bulbK: number): number {
+  return ((PaPa + g.headK * pv('waterDensity') * pv('gravity') * x) * (g.V0 + g.A * x)) / bulbK;
+}
 const WEATHER_SPILLED = { top: '水があふれて減ったまま。管の水が、置いたときの印と合わない', bottom: '壺に空気が入ったまま。管の水が、置いたときの印と合わない' };
 
 const sourceOk = (req: ScienceStepRequest) => ['live', 'simulation', 'record'].includes(req.environment.source as string);
@@ -141,10 +159,10 @@ export function barometerPotStep(req: ScienceStepRequest): ScienceStepResult {
     d = { eqId: eq.equipmentId, paramsFp: fpOf(eq.params ?? {}), g: b.g, leakK: (b.capM3 / (T0 * b.tauMin * 60)) * (b.g.headK * pv('waterDensity') * pv('gravity')), startMs: req.interval.from, lastTo: req.interval.from,
       waterFp: fingerprint(water), waterMg: water.amount.value, waterLocation: water.location, spilledMg: 0,
       s: { tMs: req.interval.from, bLo: T0, bHi: T0, sLo: s0, sHi: s0 }, ctl: { tKnown: true, Ta: T0, pKnown: true, Pa: P0, dsLo: 0, dsHi: 0 },
-      lastPaPa: P0, lastPaAt: req.interval.from, gapOpen: false, gapLoMinK: T0, gapHiMaxK: T0, gapSLo: s0, gapSHi: s0, condition: 'ok', spilledAt: -1,
+      lastPaPa: P0, lastPaAt: req.interval.from, gapOpen: false, gapLoMinK: T0, gapHiMaxK: T0, gapSLo: s0, gapSHi: s0, condition: 'ok', spilledAt: -1, bubbles: 0, lastBubbleAt: -1, bubbleSaidAt: -1,
       historyComplete: (water.quality?.history_complete ?? 1) === 1 };
   } else {
-    if (!stateShapeOk(req.state.data, { num: ['leakK', 'startMs', 'lastTo', 'waterMg', 'spilledMg', 'lastPaPa', 'lastPaAt', 'gapLoMinK', 'gapHiMaxK', 'gapSLo', 'gapSHi', 'spilledAt'],
+    if (!stateShapeOk(req.state.data, { num: ['leakK', 'startMs', 'lastTo', 'waterMg', 'spilledMg', 'lastPaPa', 'lastPaAt', 'gapLoMinK', 'gapHiMaxK', 'gapSLo', 'gapSHi', 'spilledAt', 'bubbles', 'lastBubbleAt', 'bubbleSaidAt'],
       str: ['eqId', 'paramsFp', 'waterFp', 'waterLocation'], oneOf: { condition: ['ok', 'spilled-top', 'spilled-bottom', 'unknown'] }, bool: ['gapOpen', 'historyComplete'],
       nested: { g: { num: ['V0', 'A', 'halfLengthM', 'markM', 'tauS', 'form', 'headK', 'topM', 'bottomM'] }, s: { num: ['tMs', 'bLo', 'bHi', 'sLo', 'sHi'] },
         ctl: { num: ['Ta', 'Pa', 'dsLo', 'dsHi'], bool: ['tKnown', 'pKnown'] } } }))
@@ -180,32 +198,46 @@ export function barometerPotStep(req: ScienceStepRequest): ScienceStepResult {
   // 0.2.2 (SB-C3): a read samples the same whole seconds from the cell's start as the spill the cell records, never its
   // own moment between them (a peak between two seconds, about a nanometre above them, was read as a spill that was
   // never recorded); the run's end is a real moment and is sampled
-  const scan = (until: number, endSample = true): { kind: 'top' | 'bottom' | 'maybe'; at: number; excessM: number } | null => {
+  // 0.3.0: the weather pot's bottom is no end: the scan reports the most air that came in (bubbleS, per bound) instead
+  const scan = (until: number, endSample = true): { kind: 'top' | 'bottom' | 'maybe' | 'bubble'; at: number; excessM: number; addLo?: number; addHi?: number } | null => {
     const c = d.ctl, s0 = d.s;
     if (!c.pKnown || d.condition !== 'ok' || until <= s0.tMs) return null;
     const s1 = at(until);
     if (s0.bLo === s0.bHi && s0.sLo === s0.sHi && c.dsLo === c.dsHi && c.tKnown) {
       // the first moment past an end, and for the mouth the highest the water stands over it in the rest of the stretch
-      let first: { kind: 'top' | 'bottom'; at: number; excessM: number } | null = null;
+      let first: { kind: 'top' | 'bottom'; at: number; excessM: number } | null = null, add = 0, addAt = -1;
       const last = endSample ? until : s0.tMs + Math.floor((until - s0.tMs) / 1000) * 1000;
       for (let t = s0.tMs; ; t = Math.min(last, t + 1000)) {
-        const x = riseOf(g, at(t).sHi, c.Pa, at(t).bHi);
+        const a = at(t), x = riseOf(g, a.sHi + add, c.Pa, a.bHi);
         if (!first && x > g.topM) first = { kind: 'top', at: t, excessM: 0 };
-        if (!first && x < -g.bottomM) return { kind: 'bottom', at: t, excessM: 0 };
+        if (!first && x < -g.bottomM) {
+          if (g.form !== 2) return { kind: 'bottom', at: t, excessM: 0 };
+          add = airAt(g, -g.bottomM, c.Pa, a.bHi) - a.sHi; addAt = t;   // air bubbles in until the water stands at the end
+        }
         if (first?.kind === 'top') first.excessM = Math.max(first.excessM, x - g.topM);
-        if (t >= last) return first;
+        if (t >= last) return first ?? (addAt >= 0 ? { kind: 'bubble', at: addAt, excessM: 0, addLo: add, addHi: add } : null);
       }
     }
     const hi = riseOf(g, Math.max(s0.sHi, s1.sHi), c.Pa, Math.max(s0.bHi, s1.bHi)), lo = riseOf(g, Math.min(s0.sLo, s1.sLo), c.Pa, Math.min(s0.bLo, s1.bLo));
-    return hi > g.topM || lo < -g.bottomM ? { kind: 'maybe', at: until, excessM: 0 } : null;
+    if (hi > g.topM || (g.form !== 2 && lo < -g.bottomM)) return { kind: 'maybe', at: until, excessM: 0 };
+    if (lo >= -g.bottomM) return null;
+    // the weather pot with bounds: the air may have come in, as much as the water at the end allows (each bound alone: the
+    // low bound at its own coldest and lowest air, the high bound only if it too fell past the end)
+    const need = (sv: number, bK: number) => Math.max(0, airAt(g, -g.bottomM, c.Pa, bK) - sv);
+    const addLo = need(Math.min(s0.sLo, s1.sLo), Math.min(s0.bLo, s1.bLo)), addHi = riseOf(g, Math.min(s0.sHi, s1.sHi), c.Pa, Math.min(s0.bHi, s1.bHi)) < -g.bottomM ? need(Math.min(s0.sHi, s1.sHi), Math.min(s0.bHi, s1.bHi)) : 0;
+    return { kind: 'bubble', at: until, excessM: 0, addLo, addHi };
   };
   /** Decide at a cell's start, with this request's weather. */
   const decide = () => {
     let dsLo = 0, dsHi = 0;
     if (d.condition === 'ok' || d.condition === 'unknown') {
       if (pKnown && d.condition === 'ok') {
-        const [xLo, xHi] = xBounds(d.s, Pa), cl = (x: number) => Math.max(-g.bottomM, Math.min(g.topM, x));
-        dsLo = -d.leakK * cl(xHi); dsHi = -d.leakK * cl(xLo);
+        // 0.3.0: each bound of the air follows its own leak (the leak's rate falls as the air grows: a still pot's air
+        // cannot cross another's, so the most air leaks out the least at its coldest bulb, the least air the most at its
+        // warmest). Before, each bound leaked at the other's rate: the bounds only ever widened, and a pot that once had
+        // a pressure gap was never read again
+        const cl = (x: number) => Math.max(-g.bottomM, Math.min(g.topM, x));
+        dsLo = -d.leakK * cl(riseOf(g, d.s.sLo, Pa, d.s.bHi)); dsHi = -d.leakK * cl(riseOf(g, d.s.sHi, Pa, d.s.bLo));
       } else { dsLo = -d.leakK * g.topM; dsHi = d.leakK * g.bottomM; } // the water anywhere in the tube
     }
     d.ctl = { tKnown, Ta: tKnown ? Ta : 0, pKnown, Pa: pKnown ? Pa : 0, dsLo, dsHi };
@@ -215,6 +247,14 @@ export function barometerPotStep(req: ScienceStepRequest): ScienceStepResult {
     if (t <= d.s.tMs) return;
     const e = scan(t);
     if (e?.kind === 'maybe') d.condition = 'unknown';
+    else if (e?.kind === 'bubble') {
+      d.s = at(t); d.s.sLo += e.addLo ?? 0; d.s.sHi = Math.max(d.s.sHi + (e.addHi ?? 0), d.s.sLo);
+      d.bubbles++; d.lastBubbleAt = t;
+      // said at the cell's close (inside this request, whatever the chunking), once an island day at most
+      if (d.bubbleSaidAt < 0 || t - d.bubbleSaidAt >= BUBBLE_SAY_MS) { d.bubbleSaidAt = t; obs(t, { text: BUBBLED }); }
+      if (d.gapOpen) { d.gapLoMinK = Math.min(d.gapLoMinK, d.s.bLo); d.gapHiMaxK = Math.max(d.gapHiMaxK, d.s.bHi); d.gapSLo = Math.min(d.gapSLo, d.s.sLo); d.gapSHi = Math.max(d.gapSHi, d.s.sHi); }
+      return;
+    }
     else if (e) {
       d.condition = e.kind === 'top' ? 'spilled-top' : 'spilled-bottom'; d.spilledAt = e.at;
       if (e.kind === 'top') d.spilledMg = Math.min(d.waterMg, Math.max(1, Math.round(e.excessM * g.A * 1e9)));
@@ -258,7 +298,14 @@ export function barometerPotStep(req: ScienceStepRequest): ScienceStepResult {
         if (R * T < Math.abs(P1 - P2)) d.condition = 'unknown';
         else {
           const pMin = Math.max(800, (P1 + P2 - R * T) / 2) * 100, pMax = Math.min(1100, (P1 + P2 + R * T) / 2) * 100;
-          if (riseOf(g, d.gapSHi, pMin, d.gapHiMaxK) > g.topM || riseOf(g, d.gapSLo, pMax, d.gapLoMinK) < -g.bottomM) d.condition = 'unknown';
+          if (g.form === 2 && riseOf(g, d.gapSLo, pMax, d.gapLoMinK) < -g.bottomM) {
+            // the weather pot (0.3.0): air may have bubbled in while nobody knew the pressure — at most what the water at
+            // the end holds at the highest pressure and the coldest bulb the gap allows, and the leak's inflow since; that
+            // air counts for the top as well (bubbled in a high, then a low: the water climbs higher)
+            const most = airAt(g, -g.bottomM, pMax, d.gapLoMinK) + d.leakK * g.bottomM * ((req.interval.from - d.lastPaAt) / 1000);
+            d.s.sHi = Math.max(d.s.sHi, most); d.gapSHi = Math.max(d.gapSHi, most);
+          }
+          if (riseOf(g, d.gapSHi, pMin, d.gapHiMaxK) > g.topM || (g.form !== 2 && riseOf(g, d.gapSLo, pMax, d.gapLoMinK) < -g.bottomM)) d.condition = 'unknown';
         }
       }
       d.gapOpen = false;

@@ -92,7 +92,7 @@ export class Ecosystem {
   constructor(oc: any) {
     this.oc = oc;
     this.env = {
-      t: 0, day: 1, night: 0, twilight: 0, sunI: 1, month: 1, mday: 1,
+      t: 0, day: 1, night: 0, twilight: 0, sunI: 1, month: 1, mday: 1, ms: 0,
       cur: { x: 0.3, z: 0.1 },
       plankton: new Plankton(LIMIT + 40),
       threats: [], threatsOut: [],
@@ -107,7 +107,7 @@ export class Ecosystem {
   setSky(s: SkyState, current: THREE.Vector2) {
     const e = this.env;
     e.day = s.day; e.night = s.night; e.twilight = s.twilight; e.sunI = s.sunI;
-    e.month = SEASON_MONTH ?? s.month; e.mday = SEASON_MONTH ? 15 : s.mday;
+    e.month = SEASON_MONTH ?? s.month; e.mday = SEASON_MONTH ? 15 : s.mday; e.ms = s.ms;
     e.cur.x = current.x; e.cur.z = current.y;
   }
 
