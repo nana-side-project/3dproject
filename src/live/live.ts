@@ -24,6 +24,7 @@ import { chapter1 } from '../world/chapter1';
 import { chapter2 } from '../world/chapter2';
 import { chapterView, startCard, endCard, goneCard, chapter2View, startCard2, endCard2, chapterShown } from './chapter-line';
 import { makeCues, trialCue, gatherCue, type Cue } from './cues';
+import { B, bubbleLines, placeBubble, tipOnScreen, makeTalk, overlaps, type Place, type Rect } from './bubble';
 
 export interface LiveCtx {
   residents(): any | null;           // the island's residents, once the island is built
@@ -38,6 +39,9 @@ export interface LiveCtx {
   cue?(c: Cue): void;                // a notification sound (audio.ts cue; PROGRAM.md §5-3)
   speaking?(): boolean;              // a resident's voice sounding now (a notification sound waits for it to end)
   cueLog?(c: Cue, sounded: boolean, why: string): void;   // (each sounded or let go, for the log: ?rehearsal)
+  /** Where r's head is on the screen (px; the point over it the bubble's tail points at), and — sight asked — whether
+   *  the camera on air sees it (BUBBLE.md §3). */
+  headAt?(r: any, sight?: boolean): { x: number; y: number; front: boolean; on: boolean; seen: boolean } | null;
 }
 /** The drone's number for each one it follows (01–04; 13 is the island round, later). */
 const DORON: Record<string, string> = { dot: '01', rakko: '02', kame: '03', lantern: '04' };
@@ -87,17 +91,15 @@ export function makeLive(ctx: LiveCtx) {
     const o = r.talk ? (r.talk.a === r ? r.talk.b : r.talk.a) : null; if (o?.saying) return o;
     return R.list.find((x: any) => x !== r && x.saying && Math.hypot(x.pos.x - r.pos.x, x.pos.z - r.pos.z) < 20) ?? null;
   };
-  // The subtitle (viewer design v2 §4): while someone speaks the band steps back, and at the bottom centre — who speaks,
-  // the line in the island's letters, its meaning (broken after its first sentence when long). Instead of the bubbles.
+  // The subtitle (viewer design v2 §4) — now only for a line that cannot be a bubble (BUBBLE.md §3: the head off the
+  // screen or hidden, no room): while it is up the band steps back, and at the bottom centre — who speaks, the line in
+  // the island's letters, its meaning (broken after its first sentence when long).
   const sub = $('.sub');
   let subKey = '';
-  function subtitle(R: any, r: any) {
-    const sp = r ? speaker(R, r) : null, key = sp ? `${sp.id}|${sp.saying}` : '';
+  function subtitle(sp: any | null, key: string, r: any) {
     if (key === subKey) return; subKey = key;
     if (!sp) { sub.classList.add('off'); if (r && !ctx.bridging?.()) band.classList.remove('off'); return; }
     const said = en ? sp.sayEn ?? '' : sp.saying;   // (in English, its own English line: none, and only the island's letters show)
-    const cap = capEn ? sp.sayEn ?? '' : sp.saying;
-    if (cap) captions.send(`${nameIn(sp, capEn)}: ${cap}`, ctx.clockMs());
     band.classList.add('off');
     const fill = () => {
       ($('.sub .who .line')).style.setProperty('--c', sp.sp?.color ?? '#fff');
@@ -109,13 +111,114 @@ export function makeLive(ctx: LiveCtx) {
     if (sub.classList.contains('off')) fill(); else { sub.classList.add('off'); setTimeout(() => { if (subKey === key) fill(); }, 600); }
   }
 
-  const director = makeDirector({ residents: ctx.residents, watched: ctx.watched, watch: ctx.watch, cam: ctx.cam, speaking: () => !!subKey, visible: ctx.visible, skip: ctx.skip });
+  // The speech bubbles (R-024, screens/BUBBLE.md; the placing, lines and times in src/live/bubble.ts): a line said is a
+  // bubble over the speaker's head when its head is in the picture and in sight as the line begins and there is room;
+  // else the subtitle. The bubble follows the head smoothly (sideways in 0.2 s, up and down in 0.6 s: no bobbing), kept
+  // clear of the corner blocks, the card, the other heads and the other bubble; at a cut it is at once where it belongs.
+  // When another begins to speak, the last stays faint until read. The band stays (only faint where a bubble lies on it).
+  const SVGNS = 'http://www.w3.org/2000/svg', bubLayer = document.createElement('div'); bubLayer.className = 'bubs';
+  const tails = document.createElementNS(SVGNS, 'svg'); tails.classList.add('tails'); bubLayer.appendChild(tails); root.appendChild(bubLayer);
+  interface Bub { el: HTMLElement; tail: SVGPolygonElement; key: string; who: any; ax: number; ay: number; place: Place | null; set: boolean }
+  const bubs: Bub[] = [0, 1, 2, 3].map(() => {   // (the one speaking, the faint one before it, and those going)
+    const el = document.createElement('div'); el.className = 'bub off';
+    el.innerHTML = '<div class="nm"></div><div class="isl-line"></div><div class="dots"></div><div class="tr"></div>';
+    bubLayer.appendChild(el);
+    const tail = document.createElementNS(SVGNS, 'polygon'); tail.classList.add('off'); tails.appendChild(tail);
+    return { el, tail, key: '', who: null, ax: 0, ay: 0, place: null, set: false };
+  });
+  const bubOf = (key: string) => bubs.find((b) => b.key === key) ?? null;
+  function fillBub(b: Bub, sp: any, key: string, lines: string[]) {
+    Object.assign(b, { key, who: sp, place: null, set: false });
+    const u = innerHeight / 1080;
+    b.el.style.setProperty('--c', sp.sp?.color ?? '#8aa');
+    b.el.classList.remove('faint'); b.tail.classList.remove('faint');
+    (b.el.querySelector('.nm') as HTMLElement).textContent = nameOf(sp);
+    const isl = b.el.querySelector('.isl-line') as HTMLElement; isl.innerHTML = sp.sayIsl?.length ? glyphs(sp.sayIsl, 'isl', 1.25) : '';
+    // (the island's letters 30 px high — less when long, down to 22 px, to keep within the bubble's widest)
+    const svg = isl.querySelector('svg'), vb = svg?.getAttribute('viewBox')?.split(' ').map(Number);
+    if (svg && vb) svg.style.height = `${Math.max(22 * u, Math.min(30 * u, ((B.wMax - 2 * B.padX) * u * vb[3]) / vb[2]))}px`;
+    (b.el.querySelector('.tr') as HTMLElement).innerHTML = lines.map((l) => `<span>${esc(l)}</span>`).join('');
+    b.el.classList.toggle('bare', !lines.length);   // (no meaning on this screen: the island's letters alone)
+  }
+  function letGo(b: Bub) {
+    b.el.classList.add('off'); b.tail.classList.add('off');
+    const k = b.key; setTimeout(() => { if (b.key === k && b.el.classList.contains('off')) { b.key = ''; b.who = null; } }, 450);
+  }
+  /** What a bubble keeps clear of: the corner blocks and the card as they are up, the other heads in the picture. */
+  function avoidFor(b: Bub): Rect[] {
+    const u = innerHeight / 1080, pad = 16 * u, out: Rect[] = [];
+    for (const sel of ['.brand', '.chap', '.when', '.card']) {
+      const el = $(sel); if (el.classList.contains('off')) continue;
+      const r = el.getBoundingClientRect(); if (r.width) out.push({ x: r.left - pad, y: r.top - pad, w: r.width + 2 * pad, h: r.height + 2 * pad });
+    }
+    for (const o of ctx.residents()?.list ?? []) {
+      if (o === b.who) continue;
+      const hp = ctx.headAt?.(o, false); if (hp?.on) out.push({ x: hp.x - 60 * u, y: hp.y - 30 * u, w: 120 * u, h: 150 * u });
+    }
+    return out;
+  }
+  /** The bubble placed for its speaker's head now (eased); true if a place clear of all was found this frame (else it
+   *  keeps where it was). */
+  function drawBub(b: Bub, dt: number, extra: Rect[]): boolean {
+    const hp = ctx.headAt?.(b.who, false); if (!hp) return false;
+    const W = innerWidth, H = innerHeight, t = tipOnScreen(hp, W, H);
+    if (!b.set || Math.hypot(t.x - b.ax, t.y - b.ay) > H * 0.25) { b.ax = t.x; b.ay = t.y; b.set = true; }   // (a cut: at once)
+    else { b.ax += (t.x - b.ax) * (1 - Math.exp(-dt / 0.2)); b.ay += (t.y - b.ay) * (1 - Math.exp(-dt / 0.6)); }
+    const p = placeBubble({ W, H, tip: { x: b.ax, y: b.ay }, w: b.el.offsetWidth, h: b.el.offsetHeight, avoid: [...avoidFor(b), ...extra], keep: b.place });
+    if (p) b.place = p;
+    const q = b.place; if (!q) return false;
+    const tip = p ? q.tip : { x: b.ax, y: b.ay };
+    b.el.style.transform = `translate(${q.x.toFixed(1)}px, ${q.y.toFixed(1)}px)`;
+    b.el.style.transformOrigin = `${((q.base[0] + q.base[2]) / 2 - q.x).toFixed(1)}px ${((q.base[1] + q.base[3]) / 2 - q.y).toFixed(1)}px`;   // (the faint one shrinks toward its tail)
+    b.tail.setAttribute('points', `${q.base[0].toFixed(1)},${q.base[1].toFixed(1)} ${q.base[2].toFixed(1)},${q.base[3].toFixed(1)} ${tip.x.toFixed(1)},${tip.y.toFixed(1)}`);
+    return !!p;
+  }
+  /** As a line begins: a bubble, if the head is in the picture and in sight, the line short enough, and room for it. */
+  function decide(sp: any, key: string): 'bubble' | 'sub' {
+    if (!ctx.headAt || ctx.bridging?.()) return 'sub';   // (the sky between two places: the subtitle, as on #228)
+    const lines = bubbleLines(en ? sp.sayEn ?? '' : sp.saying, en ? 'en' : 'ja'), hp = ctx.headAt(sp);
+    const b = bubs.find((x) => !x.key);
+    if (!lines || !hp?.on || !hp.seen || !b) return 'sub';
+    fillBub(b, sp, key, lines);
+    const others = bubs.filter((x) => x !== b && x.key && x.place && !x.el.classList.contains('off')).map((x) => x.place!);
+    if (drawBub(b, 0, others) || (b.place = null, drawBub(b, 0, []))) { b.el.classList.remove('off'); b.tail.classList.remove('off'); return 'bubble'; }
+    b.key = ''; b.who = null; return 'sub';
+  }
+  let speakerNow: any = null, talking = false, capKey = '';
+  const talk = makeTalk((line) => decide(speakerNow, line.key));
+  function talkTick(R: any, r: any, dt: number) {
+    const sp = r ? speaker(R, r) : null, key = sp ? `${sp.id}|${sp.saying}` : '';
+    if (sp && key !== capKey) {   // (YouTube's captions as before, a line each, bubble or subtitle: BUBBLE.md §7)
+      capKey = key; const cap = capEn ? sp.sayEn ?? '' : sp.saying;
+      if (cap) captions.send(`${nameIn(sp, capEn)}: ${cap}`, ctx.clockMs());
+    }
+    speakerNow = sp;
+    const { cur, prev } = talk.tick(performance.now(), sp ? { key, who: sp.id, ja: [...sp.saying].length } : null);
+    talking = !!cur;
+    subtitle(cur?.mode === 'sub' ? sp : null, cur?.mode === 'sub' ? cur.key : '', r);
+    const cb = cur?.mode === 'bubble' ? bubOf(cur.key) : null, pb = prev ? bubOf(prev.key) : null;
+    for (const b of bubs) if (b.key && b !== cb && b !== pb && !b.el.classList.contains('off')) letGo(b);
+    let pr: Rect[] = [];
+    if (pb) {
+      pb.el.classList.add('faint'); pb.tail.classList.add('faint');
+      drawBub(pb, dt, []);
+      if (pb.place) {   // (as it is drawn: 92 % about the root of its tail, and a little room round it)
+        const q = pb.place, ox = (q.base[0] + q.base[2]) / 2, oy = (q.base[1] + q.base[3]) / 2, k = innerHeight / 1080 * 10, s = 0.92;
+        pr = [{ x: ox + (q.x - ox) * s - k, y: oy + (q.y - oy) * s - k, w: q.w * s + 2 * k, h: q.h * s + 2 * k }];
+      }
+    }
+    if (cb && !drawBub(cb, dt, pr) && pb) { talk.dropPrev(); letGo(pb); drawBub(cb, 0, []); }   // (the faint one in the way: it goes)
+    const br = band.getBoundingClientRect(), bandR = { x: br.left, y: br.top, w: br.width, h: br.height };
+    band.classList.toggle('dim', [cb, pb].some((b) => b?.place && !b.el.classList.contains('off') && overlaps(b.place, bandR)));
+  }
+
+  const director = makeDirector({ residents: ctx.residents, watched: ctx.watched, watch: ctx.watch, cam: ctx.cam, speaking: () => talking, visible: ctx.visible, skip: ctx.skip });
   function update(dt: number) {
     const R = ctx.residents();
     if (!R) return;
     director.tick(dt);   // (whom the drone follows: director.ts)
     const r = ctx.watched();
-    subtitle(R, r);   // (every frame: a line begins and ends with the voice)
+    talkTick(R, r, dt);   // (every frame: a line begins and ends with the voice; a bubble follows its head)
     // (the sky between two places: no band on it; the next one's band comes in after it, as for another one followed)
     if (ctx.bridging?.()) { band.classList.add('off'); shownFor = ''; }
     if ((tick -= dt) > 0) return; tick = 1;   // (the words read once a second)
@@ -219,6 +322,9 @@ export function makeLive(ctx: LiveCtx) {
       g.haze.style.setProperty('--bright', st.bright.toFixed(3));
       g.haze.style.setProperty('--blur', `${(st.blurPx * u).toFixed(2)}px`);
     }
+    // (the bubbles' ground a shade darker when the picture is dark — night: BUBBLE.md §8, the "dark" of v2 §5)
+    const all: number[] = []; for (let i = 0; i < px.length; i += 4) all.push(luminance(px[i], px[i + 1], px[i + 2]));
+    bubLayer.classList.toggle('night', hazeFor(brightTenth(all)) === 0);
   }
   /** For the stream's log (the test week): how hazy each group is now, 0–1. */
   const haze = () => Object.fromEntries(groups.map((g, i) => [['brand', 'when', 'chap', 'band', 'sub', 'card'][i], +g.h.toFixed(3)]));

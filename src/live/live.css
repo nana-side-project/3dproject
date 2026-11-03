@@ -91,3 +91,32 @@ body.live #diaryBook, body.live #newMark, body.live #hoverTag, body.live #tapRin
 #live.en .chap .c1 { font-size: calc(var(--s4) + var(--u) * 4); }
 #live.en .chap .c1 .no { font-style: italic; font-size: calc(var(--s2) + var(--u) * 2); letter-spacing: 0.04em; }
 #live.en .chap .cargo { font-family: var(--latin); font-style: italic; font-size: var(--s2); letter-spacing: 0.03em; }   /* (Garamond's old-style 1 reads as an i: "Island year 1") */
+
+/* The speech bubbles (R-024, screens/BUBBLE.md §1, §8): a light ground, dark Mincho; the name in the speaker's colour
+   half mixed with the ink, the island's letters, a dotted rule in its colour, the meaning (s4, three lines at most).
+   Placed and moved by live.ts (transform); 0.25 s in, rising 6 px; the one before faint (55 %, no shadow, 92 %). */
+#live .bubs { position: absolute; inset: 0; }
+#live .bubs .tails { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+#live .bubs .tails polygon { fill: rgba(251, 248, 241, 0.96); transition: opacity 0.25s ease; }
+#live .bubs .tails polygon.faint { opacity: 0.55; transition: opacity 0.4s ease; }
+#live .bubs .tails polygon.off { opacity: 0; }
+#live .bub { position: absolute; left: 0; top: 0; width: max-content; max-width: calc(var(--u) * 690); min-width: calc(var(--u) * 220);
+  box-sizing: border-box; padding: calc(var(--u) * 18) calc(var(--u) * 26); border-radius: calc(var(--u) * 24);
+  background: rgba(251, 248, 241, 0.96); color: #23343a; text-shadow: none; text-align: left; letter-spacing: 0.02em;
+  box-shadow: 0 calc(var(--u) * 6) 0 color-mix(in srgb, var(--c) 70%, transparent), 0 calc(var(--u) * 14) calc(var(--u) * 36) rgba(0, 0, 0, 0.35);
+  transition: opacity 0.25s ease, translate 0.25s ease, scale 0.25s ease; translate: 0 0; will-change: transform; }
+#live .bub.off { opacity: 0; translate: 0 calc(var(--u) * 6); }
+#live .bub.faint { opacity: 0.55; scale: 0.92; box-shadow: none; transition: opacity 0.4s ease, scale 0.25s ease; }
+#live .bub.faint.off { opacity: 0; }
+#live .bub .nm { font-size: var(--s1); font-weight: 600; letter-spacing: 0.1em; line-height: 1; color: color-mix(in srgb, var(--c) 50%, #23343a); }
+#live .bub .isl-line { margin-top: calc(var(--u) * 10); line-height: 0; }
+#live .bub .isl-line .isl { height: calc(var(--u) * 30); color: rgba(35, 52, 58, 0.8); }
+#live .bub .dots { margin: calc(var(--u) * 10) 0; border-top: 1.5px dotted color-mix(in srgb, var(--c) 60%, transparent); }
+#live .bub .tr { font-size: var(--s4); line-height: 1.45; white-space: nowrap; }
+#live .bub .tr span { display: block; }
+#live .bub.bare .dots, #live .bub.bare .tr { display: none; }
+#live.en .bub .tr { font-family: 'Cormorant Garamond', serif; font-size: calc(var(--u) * 44); line-height: 1.3; }
+#live .bubs.night .bub { background: rgba(232, 226, 213, 0.9); }
+#live .bubs.night .tails polygon { fill: rgba(232, 226, 213, 0.9); }
+/* (a bubble lying on the band: the band faint, never moved — BUBBLE.md §5) */
+#live .band.dim:not(.off) { opacity: 0.3; }
