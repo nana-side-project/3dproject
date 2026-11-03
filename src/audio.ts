@@ -707,14 +707,14 @@ export function babble(who: string, text: string, vol: number, pan = 0) {
 // ---------- the notification sounds (viewer design PROGRAM.md §5-3; when: src/live/cues.ts) ----------
 // The same sound for the same kind of moment. A wooden bar's notes for a try — two rising and bright when it held, two
 // falling and low when it did not, one soft when it is decided; three clear notes of a glass bell, some three seconds,
-// with a card (a first on the island, a chapter); two knocks of wood as a gathering begins, one small five minutes
-// before. Some 3 dB under the voices (§5-1), measured rendered offline: a resident's line near the drone comes to about
+// with a card (a first on the island, a chapter), one of them as a timed sight begins; two knocks of wood as a gathering
+// begins, one small five minutes before. Some 3 dB under the voices (§5-1), measured rendered offline: a resident's line near the drone comes to about
 // −27.5 dB over its loudest 0.4 s, the two notes and the bell's three to about −30.5; the soft note and the knocks under
 // that (a knock is short: its top near −19 dB). Rounded onsets, and nothing sharp — the master's low-pass takes the top off.
 let cueBus: GainNode | null = null;
 /** Whether a resident's voice is sounding now (a notification sound waits for it to end). */
 export const speaking = () => Object.keys(lumauNow).length > 0;
-export type CueKind = 'first' | 'good' | 'bad' | 'decided' | 'gather' | 'gather-soon';
+export type CueKind = 'first' | 'good' | 'bad' | 'decided' | 'gather' | 'gather-soon' | 'sight';
 export function cue(kind: CueKind) {
   if (!ac || !audio.on) return;
   if (!cueBus) { cueBus = ac.createGain(); cueBus.gain.value = 1; cueBus.connect(master); const send = ac.createGain(); send.gain.value = 0.3; cueBus.connect(send).connect(reverb); }
@@ -759,5 +759,6 @@ export function cueInto(a: BaseAudioContext, out: AudioNode, kind: CueKind, t0: 
     case 'first': bell(784, t0, 0.036); bell(987.8, t0 + 0.22, 0.033); bell(1174.7, t0 + 0.44, 0.033); break;   // G5 B5 D6
     case 'gather': knock(t0, 0.105); knock(t0 + 0.24, 0.095); break;
     case 'gather-soon': knock(t0, 0.055); break;
+    case 'sight': bell(784, t0, 0.036); break;                                    // G5: the card's bell, one note (a timed sight begins)
   }
 }

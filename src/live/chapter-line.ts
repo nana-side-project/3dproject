@@ -3,7 +3,7 @@
 // and its two cards, the start (the question) and the end (what the world did). The words only, from the world's own
 // record (world/chapter1.ts); the screen decides nothing.
 import { WAY, LOAD_JA, LOAD_EN, type Chapter1, type Stage, type LoadWord } from '../world/chapter1';
-import { WAY2, type Chapter2, type Stage2 } from '../world/chapter2';
+import { WAY2, KEY2, type Chapter2, type Stage2 } from '../world/chapter2';
 
 const WAY_JA: Record<string, string> = { hut: '小屋', raft: '筏', south: '南の島へ' };
 const WAY_EN: Record<string, string> = { hut: 'hut', raft: 'raft', south: 'the south island' };
@@ -66,6 +66,14 @@ export function chapter2View(c: Chapter2, now: number, tz: number, en: boolean):
     way: WAY2.map((s) => ({ w: (en ? WAY2_EN : WAY2_JA)[s], k: c.way[s] !== null ? 'done' : s === next ? 'now' : 'later' })),
     cargo: null,
   };
+}
+/** The chapter's stages done between two times (the day's card at 19:00, TRIAL6.md §1-5): each one's word on the way, when
+ *  the world says it was done, and the first it reads (a stage whose first had its card that day is said once). */
+export function stagesDone(c1: Chapter1 | null, c2: Chapter2 | null, from: number, to: number, en: boolean): { w: string; at: number; key: string }[] {
+  const out: { w: string; at: number; key: string }[] = [], inDay = (at: number | null): at is number => at !== null && at > 0 && at >= from && at < to;
+  if (c1) for (const s of WAY) { const at = c1.way[s as Stage]; if (inDay(at)) out.push({ w: (en ? WAY_EN : WAY_JA)[s], at, key: s === 'south' ? 'south-load' : s }); }
+  if (c2) for (const s of WAY2) { const at = c2.way[s]; if (inDay(at)) out.push({ w: (en ? WAY2_EN : WAY2_JA)[s], at, key: KEY2[s] }); }
+  return out;
 }
 /** Chapter 2's start card: its heading and the question. */
 export function startCard2(en: boolean) {

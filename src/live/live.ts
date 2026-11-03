@@ -12,7 +12,7 @@ import '@fontsource/cormorant-garamond/500.css';
 import '@fontsource/cormorant-garamond/600.css';
 import '@fontsource/cormorant-garamond/500-italic.css';
 import './live.css';
-import { islandDate } from '../world/island-time';
+import { islandDate, islandEpoch } from '../world/island-time';
 import { localTimeString } from '../time/clock';
 import { trimStatus, wrapStatus, subtitleLines } from './status-line';
 import { glyphs, LEX } from '../robots/islandlang';
@@ -22,11 +22,12 @@ import { captionSender } from './captions';
 import { makeDirector, awake } from './director';
 import { chapter1 } from '../world/chapter1';
 import { chapter2 } from '../world/chapter2';
-import { chapterView, startCard, endCard, goneCard, chapter2View, startCard2, endCard2, chapterShown } from './chapter-line';
+import { chapterView, startCard, endCard, goneCard, chapter2View, startCard2, endCard2, chapterShown, stagesDone } from './chapter-line';
 import { makeCues, trialCue, gatherCue, type Cue } from './cues';
 import { B, bubbleLines, placeBubble, tipOnScreen, makeTalk, overlaps, type Place, type Rect } from './bubble';
 import { PLACES, HERE_M, placeWords, type PlaceId } from './fixed';
 import type { Pose } from './fleet';
+import { SIGHTS, nextSight, nextWords, todayLines, calmOf, dayKey, dayStart, emptyDay, TODAY_S, type DayRec, type SightId } from './sights';
 
 export interface LiveCtx {
   residents(): any | null;           // the island's residents, once the island is built
@@ -50,10 +51,14 @@ export interface LiveCtx {
   places?(): { subj: { id: PlaceId; place: PlaceId; no: string }; at: Pose }[];
   /** A place's things as the world has them now, for its band (fixed.ts placeWords). */
   placeState?(id: PlaceId): { built: number; roofN: number; hutN: number; raft: { parts: number; n: number; away: boolean }; firing: boolean; boiling: boolean; drying: boolean; lit: boolean } | null;
+  /** The sun's rise and set on the island's day of ms (clock.ts sunEvents at its site): the day's timed sights. */
+  sun?(ms: number): { rise: number; set: number };
+  /** A camera's timed sight in its time now, and the camera for it (main.ts: 07 the beach, or 13 above the island). */
+  sight?(): { id: SightId; key: string; subj: any } | null;
 }
-/** The drone's number for each one it follows (01–04; 13 is the island round, later). */
-const DORON: Record<string, string> = { dot: '01', rakko: '02', kame: '03', lantern: '04' };
-const DORON_ORDER = Object.keys(DORON);
+/** The drone's number for each one it follows (01–04; 13 the sky's, above the island). */
+const DORON: Record<string, string> = { dot: '01', rakko: '02', kame: '03', lantern: '04', sky: '13' };
+const DORON_ORDER = ['dot', 'rakko', 'kame', 'lantern'];
 export function makeLive(ctx: LiveCtx) {
   document.body.classList.add('live');
   // (?lang=en: the same window in English — the world's words turned on this side only: src/live/en.ts; ?captions=<url>:
@@ -68,6 +73,7 @@ export function makeLive(ctx: LiveCtx) {
   root.innerHTML = `
     <div class="brand"><div class="en">UTSUSHIYO PROJECT</div><div class="ja"><i class="ser">Series 1</i>${en ? FIXED_EN.brand : 'ルマウ'}</div></div>
     <div class="when"><div><span class="date"></span><span class="time"></span></div><div class="ai">${en ? FIXED_EN.ai : '住人はAIです ・ 映像は自動で撮影しています'}</div></div>
+    <div class="next fade off"></div>
     <div class="chap fade off"><div class="c1"><span class="no"></span><span class="nm"></span><span class="dy"></span></div><div class="way fade"></div><div class="cargo fade"></div></div>
     <div class="band fade off"><div class="doron"><span class="n"></span>DORON</div>
       <div class="who"><span class="isl-name"></span><span class="name"></span><span class="line"></span></div><div class="status fade"></div><div class="trial fade off"><span class="k"></span><span class="t"></span></div></div>
@@ -87,9 +93,9 @@ export function makeLive(ctx: LiveCtx) {
     status.innerHTML = lines.map((l) => `<span>${l.replace(/[<&]/g, (c) => (c === '<' ? '&lt;' : '&amp;'))}</span>`).join('');
     const pl = r.place ? PLACES.find((x) => x.id === r.place) : null;   // (a place's camera: its number and the place's name — MULTICAM.md §3-1)
     $('.doron .n').textContent = pl?.no ?? DORON[r.id] ?? '13';
-    $('.band .who .name').textContent = pl ? (en ? pl.en : pl.ja) : nameOf(r);
-    $('.band .who .isl-name').innerHTML = pl ? (pl.isl ? glyphs([pl.isl], 'isl', 1.25) : '') : islName(r);
-    ($('.band .who .line')).style.setProperty('--c', pl ? 'var(--ink2)' : r.sp?.color ?? '#fff');
+    $('.band .who .name').textContent = pl ? (en ? pl.en : pl.ja) : r.sky ? (en ? 'Above the island' : '島の上') : nameOf(r);   // (the sky's: 13, above the island — nesi)
+    $('.band .who .isl-name').innerHTML = pl ? (pl.isl ? glyphs([pl.isl], 'isl', 1.25) : '') : r.sky ? glyphs(['nesi'], 'isl', 1.25) : islName(r);
+    ($('.band .who .line')).style.setProperty('--c', pl || r.sky ? 'var(--ink2)' : r.sp?.color ?? '#fff');
   }
   // A place's band (MULTICAM.md §3-1): those here (in the residents' order) — the first one's doing the line, who is here the
   // small line; none here: the thing as it is now (fixed.ts placeWords); neither: the place's name alone.
@@ -106,6 +112,7 @@ export function makeLive(ctx: LiveCtx) {
   // (who is speaking, of the one followed and whoever it is with: the followed one, the one it talks with, or one
   // speaking near it at the fire)
   const speaker = (R: any, r: any) => {
+    if (r.sky) return null;   // (the sky's camera: no one's line — a talk cuts in on it, director.ts)
     if (r.place) return hereAt(R, r).find((x: any) => x.saying) ?? null;   // (a place on air: one of those here speaking)
     if (r.saying) return r;
     const o = r.talk ? (r.talk.a === r ? r.talk.b : r.talk.a) : null; if (o?.saying) return o;
@@ -167,7 +174,7 @@ export function makeLive(ctx: LiveCtx) {
   /** What a bubble keeps clear of: the corner blocks and the card as they are up, the other heads in the picture. */
   function avoidFor(b: Bub): Rect[] {
     const u = innerHeight / 1080, pad = 16 * u, out: Rect[] = [];
-    for (const sel of ['.brand', '.chap', '.when', '.card']) {
+    for (const sel of ['.brand', '.chap', '.when', '.next', '.card']) {
       const el = $(sel); if (el.classList.contains('off')) continue;
       const r = el.getBoundingClientRect(); if (r.width) out.push({ x: r.left - pad, y: r.top - pad, w: r.width + 2 * pad, h: r.height + 2 * pad });
     }
@@ -234,7 +241,7 @@ export function makeLive(ctx: LiveCtx) {
     band.classList.toggle('dim', [cb, pb].some((b) => b?.place && !b.el.classList.contains('off') && overlaps(b.place, bandR)));
   }
 
-  const director = makeDirector({ residents: ctx.residents, watched: ctx.watched, watch: ctx.watch, cam: ctx.cam, speaking: () => talking, visible: ctx.visible, skip: ctx.skip, places: ctx.places });
+  const director = makeDirector({ residents: ctx.residents, watched: ctx.watched, watch: ctx.watch, cam: ctx.cam, speaking: () => talking, visible: ctx.visible, skip: ctx.skip, places: ctx.places, sight: ctx.sight });
   function update(dt: number) {
     const R = ctx.residents();
     if (!R) return;
@@ -247,9 +254,13 @@ export function makeLive(ctx: LiveCtx) {
     $('.when .date').textContent = dateOf(ctx.clockMs());
     $('.when .time').textContent = localTimeString(ctx.clockMs(), ctx.tz());
     chapterLine(R);
+    sightTick(R);   // (the day's timed sights: the bell as one begins, the day's card at 19:00, the top right's "このあと")
     if (!r || ctx.bridging?.()) { band.classList.add('off'); return; }
     if (r.place) hereLine(R, r); else trialLine(r);
-    const text = trimStatus(r.place ? placeText(R, r) : (R.status(r) as string));   // (as it is shown: the metres still to go taken out, or the line would fade out and back with the same words each time they change — science, #121)
+    // (a timed sight on a camera of its own: its word on the band — 夜明け, 島めぐり, 夕日: MULTICAM.md §3-1; the sky's camera
+    // otherwise the place's name alone)
+    const on = director.sightOn(), word = on ? SIGHTS[on.id].word ?? '' : null;
+    const text = trimStatus(word ?? (r.place ? placeText(R, r) : r.sky ? '' : (R.status(r) as string)));   // (as it is shown: the metres still to go taken out, or the line would fade out and back with the same words each time they change — science, #121)
     if (r.id !== shownFor) {   // (another one followed: the band fades out, changes, fades in)
       band.classList.add('off'); shownFor = r.id; shownText = text; swapT = 0.6;
       setTimeout(() => { show(r, text); if (!subKey) band.classList.remove('off'); }, 600);
@@ -330,11 +341,46 @@ export function makeLive(ctx: LiveCtx) {
     swap('.chap .cargo', v.cargo ? `${esc(v.cargo.label)}${v.cargo.items.map((x) => `<span class="lv${x.low ? ' low' : ''}">${esc(x.w)}</span>`).join(sep)}` : '');
     chap.classList.remove('off');
   }
+  // The day's timed sights (PROGRAM.md §3, TRIAL6.md §1; src/live/sights.ts): the bell's one note as one begins on air
+  // (the dawn, the island round, the sunset: the director puts them there) and as the day's card comes; the day's card at
+  // 19:00 — the day's facts, three at most, in the words the screen showed them in (kept in this browser through the day,
+  // with the island's calendar); at the top right, "このあと" — the next sight, always one. None in a typhoon.
+  const nextEl = $('.next'), DAY_KEY = 'seaglass.liveDay';
+  let nextShown = '', sightRung = '';
+  const dayName = () => `${islandEpoch()}:${dayKey(ctx.clockMs(), ctx.tz())}`;
+  let dayRec: DayRec = (() => { try { const v = JSON.parse(localStorage.getItem(DAY_KEY) || 'null'); if (v && typeof v.day === 'string' && Array.isArray(v.results) && Array.isArray(v.firsts)) return v as DayRec; } catch { /* none kept */ } return emptyDay(''); })();
+  const today = () => { const d = dayName(); if (dayRec.day !== d) dayRec = emptyDay(d); return dayRec; };
+  const keepDay = () => { try { localStorage.setItem(DAY_KEY, JSON.stringify(dayRec)); } catch { /* kept for this page only */ } };
+  /** The day's card's lines now (sights.ts todayLines): what the screen showed today, and the chapter's stages done today. */
+  function todayCard(R: any): string[] {
+    const now = ctx.clockMs(), c1 = R.village ? chapter1(R.village) : null, c2 = R.village ? chapter2(R.village) : null;
+    return todayLines(today(), stagesDone(c1, c2, dayStart(now, ctx.tz()), now + 1, en), en, esc, (key, name) => firstEn(key, name, true));
+  }
+  function sightTick(R: any) {
+    const now = ctx.clockMs(), tz = ctx.tz(), calm = calmOf(R), on = director.sightOn();
+    // (the bell as a camera's sight begins on air — once for it, though gone back to after what cut in on it)
+    if (on && on.key !== sightRung) { sightRung = on.key; if (SIGHTS[on.id].bell) cues.want('sight', performance.now()); }
+    // (the day's card at 19:00 for fifteen seconds, only as it happens — not on opening the page later; none on a day
+    // with nothing for it; its bell, the card's one note)
+    const at = dayStart(now, tz) + 19 * 3.6e6, lines = todayCard(R);
+    if (calm && now >= at && now - at < 5 * 60e3 && lines.length && once(`seaglass.today:${dayName()}`))
+      queue.push({ head: en ? SIGHTS.today.en : SIGHTS.today.ja, text: lines.map((l) => `<span class="l">${l}</span>`).join(''), at, secs: TODAY_S, cue: 'sight', cls: 'today' });
+    // (the top right: its heading, the time, the name — swapped over 0.6 s as it changes)
+    const n = ctx.sun ? nextSight(now, tz, ctx.sun, { calm, over: director.sightOver, on: on?.id ?? null, today: lines.length > 0 }) : null;
+    const w = n ? nextWords(n, tz, en, localTimeString) : null;
+    const html = w ? `<span class="k">${esc(w.k)}</span>${w.tm ? `<span class="tm">${w.tm}</span>` : ''}<span class="nm">${esc(w.name)}</span>` : '';
+    if (html === nextShown) return;
+    const first = !nextShown; nextShown = html;
+    if (!html) { nextEl.classList.add('off'); return; }
+    if (first) { nextEl.innerHTML = html; nextEl.classList.remove('off'); return; }
+    nextEl.classList.add('off'); setTimeout(() => { if (nextShown === html) { nextEl.innerHTML = html; nextEl.classList.remove('off'); } }, 600);
+  }
+
   // The haze under each group of words (src/live/scrim.ts): once a second, right after the frame is drawn, the picture
   // shrunk to 64 × 36; the bright tenth of what lies behind each group sets its haze, eased over a second (CSS).
   const SW = 64, SH = 36, shrink = document.createElement('canvas'); shrink.width = SW; shrink.height = SH;
   const sctx = shrink.getContext('2d', { willReadFrequently: true })!;
-  const groups = ['.brand', '.when', '.chap', '.band', '.sub', '.card'].map((sel) => { const el = $(sel), haze = document.createElement('div'); haze.className = 'haze'; root.insertBefore(haze, root.firstChild); return { el, haze, h: 0 }; });
+  const groups = ['.brand', '.when', '.next', '.chap', '.band', '.sub', '.card'].map((sel) => { const el = $(sel), haze = document.createElement('div'); haze.className = 'haze'; root.insertBefore(haze, root.firstChild); return { el, haze, h: 0 }; });
   let sampleAt = 0;
   function sample(canvas: HTMLCanvasElement) {
     const now = performance.now(); if (now - sampleAt < 1000) return; sampleAt = now;
@@ -358,13 +404,13 @@ export function makeLive(ctx: LiveCtx) {
     bubLayer.classList.toggle('night', hazeFor(brightTenth(all)) === 0);
   }
   /** For the stream's log (the test week): how hazy each group is now, 0–1. */
-  const haze = () => Object.fromEntries(groups.map((g, i) => [['brand', 'when', 'chap', 'band', 'sub', 'card'][i], +g.h.toFixed(3)]));
+  const haze = () => Object.fromEntries(groups.map((g, i) => [['brand', 'when', 'next', 'chap', 'band', 'sub', 'card'][i], +g.h.toFixed(3)]));
 
   // The milestone card (viewer design v2 §4): when the world marks an event the first of its kind on the island, at the
   // upper centre between two gold hair lines — "島で初めて", the event's own sentence (to its first 。), the island's
   // date and time — for about eight seconds, then it fades. Several at once wait their turn. The chapter's own cards
   // (its start and end) take the same place with their own heading.
-  const card = $('.card'), queue: { head?: string; text: string; at: number; shown?: () => void }[] = [];
+  const card = $('.card'), queue: { head?: string; text: string; at: number; shown?: () => void; secs?: number; cue?: Cue; cls?: string }[] = [];
   let cardT = 0;
   // The notification sounds (PROGRAM.md §5-3, src/live/cues.ts): a card's three notes as it shows; a try's as it is decided
   // or comes out (words on the screen only); the gatherings' knocks, from the island's clock. On the viewer's own time:
@@ -382,8 +428,12 @@ export function makeLive(ctx: LiveCtx) {
     // on one already followed, only the heading changes, PROGRAM.md §4)
     if (meta?.trial?.text && meta.trial.result !== 'steps-done') director.trial(r, meta.trial.result ?? 'start', meta.trial.text);
     { const c = en ? null : trialCue(meta?.trial); if (c) cues.want(c, performance.now()); }   // (no words on the English screen yet: no sound for them)
+    // (the day's record, for its card at 19:00: a try that came out — 確かめた・違っていた・やりとげた — with its words)
+    const tr = meta?.trial, tk = tr?.text && tr.result && ['confirmed', 'refuted', 'done'].includes(tr.result) ? TRIAL_K[tr.result] : null;
+    if (r && tr && tk) { const d = today(); d.results.push({ who: r.id, name: nameIn(r, false), head: tk[0], words: tr.text!, held: tk[2], at: ctx.clockMs() }); if (d.results.length > 40) d.results.shift(); keepDay(); }
     if (!meta?.milestone) return;
     const ja = trimStatus(text.split('。')[0]), esc1 = (t: string) => t.replace(/[<&]/g, (c) => (c === '<' ? '&lt;' : '&amp;'));
+    if (ja) { const d = today(); d.firsts.push({ key: meta.milestone, name: r?.v?.name ?? '', text: ja, at: ctx.clockMs() }); if (d.firsts.length > 40) d.firsts.shift(); keepDay(); }
     const html = en ? firstEn(meta.milestone, r?.v?.name ?? '', true) : esc1(ja);
     if (html) queue.push({ text: html, at: ctx.clockMs() });   // (a first the English table does not have: no card rather than one in the wrong tongue)
     const cap = capEn ? firstEn(meta.milestone, r?.v?.name ?? '') : ja;
@@ -396,7 +446,8 @@ export function makeLive(ctx: LiveCtx) {
     $('.card .head').textContent = m.head ?? (en ? FIXED_EN.first : '島で初めて');
     $('.card .what').innerHTML = m.text;   // (escaped as it was made: only an island's word in italics)
     $('.card .at').innerHTML = `${esc(dateOf(m.at))} <span class="t">${localTimeString(m.at, ctx.tz())}</span>`;
-    card.classList.remove('off'); cardT = 8; m.shown?.(); cues.want('first', performance.now());
+    card.classList.toggle('today', m.cls === 'today');   // (the day's card: its lines, a step smaller)
+    card.classList.remove('off'); cardT = m.secs ?? 8; m.shown?.(); cues.want(m.cue ?? 'first', performance.now());
   }
 
   /** A try's result, for the trials' screen (PROGRAM.md §1): the drone goes to the one whose try it was (rank 1). */

@@ -42,6 +42,12 @@ body.live #diaryBook, body.live #newMark, body.live #hoverTag, body.live #tapRin
 #live .when .date { font-size: var(--s2); color: var(--ink2); }
 #live .when .time { font-family: var(--mono); font-weight: 400; font-size: var(--s2); margin-left: 0.8em; color: var(--ink); }
 #live .when .ai { font-size: var(--s1); color: var(--ink3); margin-top: calc(var(--u) * 8); letter-spacing: 0.06em; }
+/* "このあと" under it (PROGRAM.md §2 割り付け: right 96, top 150): the heading small in sand, the time in mono, the name */
+#live .next { position: absolute; right: calc(var(--u) * 96); top: calc(var(--u) * 150); text-align: right; font-size: var(--s2); line-height: 1; letter-spacing: 0.1em; white-space: nowrap; }
+#live .next .k { font-size: var(--s1); letter-spacing: 0.2em; color: var(--gold); margin-right: calc(var(--u) * 16); }
+#live .next .tm { font-family: var(--mono); font-weight: 400; letter-spacing: 0.04em; margin-right: calc(var(--u) * 12); }
+#live.en .next { font-family: var(--latin); letter-spacing: 0.02em; }
+#live.en .next .k { letter-spacing: 0.12em; text-transform: uppercase; }
 /* bottom left: the band — the drone's number, the resident, what it is doing */
 #live .band { position: absolute; left: calc(var(--u) * 96); bottom: calc(var(--u) * 88); max-width: 50vw;
   padding-left: calc(var(--u) * 22); border-left: 1px solid rgba(255, 250, 240, 0.38); }
@@ -80,6 +86,9 @@ body.live #diaryBook, body.live #newMark, body.live #hoverTag, body.live #tapRin
 #live .card .what { font-size: var(--s6); line-height: 1.35; }
 #live .card .at { font-size: var(--s1); color: var(--ink2); margin: calc(var(--u) * 16) 0 calc(var(--u) * 22); letter-spacing: 0.06em; }
 #live .card .at .t { font-family: var(--mono); font-weight: 400; margin-left: 0.6em; }
+/* the day's card at 19:00 (TRIAL6.md §1-5): up to three facts, a line each, a step smaller */
+#live .card.today .what { font-size: var(--s4); line-height: 1.5; }
+#live .card.today .what .l { display: block; }
 /* in English (?lang=en): the Latin face for the world's words; less spacing, which suits Mincho, not Garamond */
 #live.en .brand .ja, #live.en .when .date, #live.en .when .ai, #live.en .band .who .name, #live.en .band .status, #live.en .sub .who, #live.en .sub .tr,
 #live.en .card .head, #live.en .card .what, #live.en .card .at { font-family: var(--latin); letter-spacing: 0.01em; }
