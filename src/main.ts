@@ -101,7 +101,7 @@ const newIslandAt = (() => {
   try { localStorage.removeItem('seaglass.residents.v1'); } catch (e) { return 0; }
   setIslandEpoch(at); return at;
 })();
-let liveUi: { update(dt: number): void; sample(canvas: HTMLCanvasElement): void; haze(): Record<string, number>; event(kind: string, text: string, r: any, meta?: { milestone?: string }): void } | null = null;
+let liveUi: { update(dt: number): void; sample(canvas: HTMLCanvasElement): void; haze(): Record<string, number>; event(kind: string, text: string, r: any, meta?: { milestone?: string }): void; talking?(): boolean } | null = null;
 const SAFE = (() => { try { return +(sessionStorage.getItem('seaglass.safe') || 0); } catch (e) { return 0; } })();
 let lostCount = 0;
 canvas.addEventListener('webglcontextlost', (e) => {
@@ -283,7 +283,7 @@ function fleetOnAir(now: number) {
   const here: Pose = { x: c.x, y: c.y, z: c.z, ang: watch.ang, off: watch.off, el: watch.el, dist: watch.dist, lx: r.pos.x, ly: mid, lz: r.pos.z };
   if (sightOf(here, r, cur.T, cur.T.solids).seen) { onAir.hiddenSince = 0; return; }
   if (!onAir.hiddenSince) { onAir.hiddenSince = now; return; }
-  if (now - onAir.hiddenSince < 3000) return;
+  if (now - onAir.hiddenSince < 3000 || liveUi?.talking?.()) return;   // (a line being said: the cut waits for its end — BUBBLE.md §10)
   onAir.hiddenSince = 0;
   const side = fleetCam(r);
   if (side) { fleetCutNow(r, side.pose); rehearsal?.event('cam-side', `${DORON[r.id] ?? '13'} ${r.id}`, true); }
@@ -3880,7 +3880,7 @@ if (live && (!location.hash || location.hash === '#')) history.replaceState(null
 if (live) import('./live/live').then((m) => { liveUi = m.makeLive({ residents: () => (mode === 'ocean' ? cur?.residents ?? null : null), watched: () => fleet.bridge?.to ?? watch.r, watch: (r) => fleetCut(r), clockMs: () => clock.ms, tz: () => cur?.loc.tz ?? 9, cam: (who, pri, kind, why) => rehearsal?.cam(who, pri, kind, why),
   visible: (r) => fleetSees(r), skip: (who, pri, why) => rehearsal?.event('cam-skip', `${DORON[who] ?? '13'} ${who} ${why}`, false), bridging: () => !!fleet.bridge,
   cue: (c) => cue(c), speaking: () => speaking(), cueLog: (c, sounded, why) => rehearsal?.event('cue', sounded ? c : `${c}（鳴らさず：${why}）`, sounded),
-  headAt: (r, sight) => headAt(r, sight) }); });
+  headAt: (r, sight) => headAt(r, sight), sayLog: (mode, who, why) => rehearsal?.event('say', `${mode} ${who}${why ? ` ${why}` : ''}`, false) }); });
 // Where a resident's head is on the screen, for the speech bubble (BUBBLE.md §2–3; src/live/bubble.ts): the point 12 cm
 // over the top of its head, as the camera on air draws it — in front of the camera or not, on the screen or not, and
 // (when asked) whether the line to it is clear of the ground and of rocks, trunks, posts (fleet.ts lineClear; the plants
