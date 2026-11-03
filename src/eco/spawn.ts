@@ -10,7 +10,7 @@
 // A world's fact, the same for everyone who looks: worked out from the real moment alone, nothing drawn at random.
 import { sunEvents } from '../time/clock';
 import { moon } from '../time/astro';
-import { islandDate } from '../world/island-time';
+import { islandDate, islandEpoch } from '../world/island-time';
 
 interface Site { lat: number; lon: number; tz: number; tide: { amp: number; lag: number }; world?: string }
 const DAY = 86400000, HOUR = 3600000, HALF = 29.530589 / 2;
@@ -60,7 +60,8 @@ const cache = new Map<string, [number, number] | null>();
 export function spawnWindow(ms: number, site: Site): [number, number] | null {
   const [a, b] = evening(ms, site);
   if (ms < a || ms > b) return null;
-  const key = `${site.world ?? 'earth'}:${site.lat}:${site.lon}:${a}`;
+  // (Dot's world: by the island's own calendar, which a new island begins afresh — #225: kept apart by its start)
+  const key = `${site.world ? `${site.world}@${islandEpoch()}` : 'earth'}:${site.lat}:${site.lon}:${a}`;
   if (cache.has(key)) return cache.get(key)!;
   const mid = (a + b) / 2;
   let ok = fits(mid, site);
