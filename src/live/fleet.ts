@@ -39,7 +39,7 @@ export function poseFor(r: Who, T: Ground, off = OFF, dist = DIST, el = EL): Pos
 }
 
 /** Inside a tree's crown at (x, y, z): under the treetops, above the bare trunks (the lower two fifths). */
-function inLeaves(T: Ground, x: number, y: number, z: number) {
+export function inLeaves(T: Ground, x: number, y: number, z: number) {
   const top = T.over ? T.over(x, z) - 0.5 : -1e9; if (top < -1e8) return false;
   const g = T.h(x, z), tall = top - g;
   return tall > 1.2 && y < top && y > g + 0.4 * tall;

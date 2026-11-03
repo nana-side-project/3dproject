@@ -90,7 +90,7 @@ if (cams.length) {
   // (the drone fleet, ADR 0010 / MULTICAM.md §5: a shot is a cam row with another one than the row before it. Each camera's
   // time, the shots an hour, a shot's length on average by day (6–21 h) and by night, the ones passed over for not being
   // seen (cam-skip rows: written once a minute at most for each), and the cuts through the sky (cam-sky rows))
-  const DORON = { dot: '01', rakko: '02', kame: '03', lantern: '04' }, shots = cams.filter((c, i) => i === 0 || c.who !== cams[i - 1].who);
+  const DORON = { dot: '01', rakko: '02', kame: '03', lantern: '04', house: '06', beach: '07', fire: '08', field: '09' }, shots = cams.filter((c, i) => i === 0 || c.who !== cams[i - 1].who);
   const byCam = {}, lens = { day: [], night: [] };
   shots.forEach((c, i) => { const end = i + 1 < shots.length ? ms(shots[i + 1]) : lastAt, len = until(ms(c), end), k = `${DORON[c.who] ?? '13'} ${c.who}`; byCam[k] = (byCam[k] ?? 0) + len; const h = new Date(ms(c) + 9 * 3600e3).getUTCHours(); (h >= 6 && h < 21 ? lens.day : lens.night).push(len); });
   const camTotal = Object.values(byCam).reduce((a, b) => a + b, 0) || 1, hours = until(ms(cams[0]), lastAt) / 3600e3 || 1, avg = (a) => (a.length ? `${(a.reduce((x, y) => x + y, 0) / a.length / 1e3).toFixed(0)} s (${a.length})` : '—');

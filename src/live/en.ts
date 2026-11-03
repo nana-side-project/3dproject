@@ -19,6 +19,9 @@ export const FIXED_EN = {
 };
 
 const EXACT: Record<string, string> = {
+  // (the fixed cameras' places, as they are now: MULTICAM.md §3-1)
+  建てている途中: 'being built', 屋根まで: 'up to the roof', できている: 'standing', 組みかけの筏: 'a raft half lashed', 筏がある: 'the raft is here',
+  筏は海に出ている: 'the raft is out at sea', 火が燃えている: 'a fire is burning', 器を乾かしている: 'vessels drying', 灯りがともっている: 'the lamp is lit',
   'お腹の上で貝を割っている': 'cracking a clam on its belly', 'お腹の上の石で貝を割って食べている': 'cracking clams on a stone on its belly, and eating',
   'となりの浜のほうへ散歩している': 'strolling towards the next beach', 'どうするか考えている': 'thinking what to do', 'ひと休みしている': 'taking a rest',
   'ヤシの実を棚へ運んでいる': 'carrying a coconut to the shelf', 'ヤシの実を棚に置いている': 'putting a coconut on the shelf',

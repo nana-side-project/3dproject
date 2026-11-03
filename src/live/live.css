@@ -120,3 +120,5 @@ body.live #diaryBook, body.live #newMark, body.live #hoverTag, body.live #tapRin
 #live .bubs.night .tails polygon { fill: rgba(232, 226, 213, 0.9); }
 /* (a bubble lying on the band: the band faint, never moved — BUBBLE.md §5) */
 #live .band.dim:not(.off) { opacity: 0.3; }
+/* (a place's band: who is here, each name after a short line of its colour — MULTICAM.md §3-1) */
+#live .band .trial .here::before { content: ''; display: inline-block; width: calc(var(--u) * 14); height: 2px; margin: 0 0.4em 0.2em 0; vertical-align: middle; background: var(--c); }

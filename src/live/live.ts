@@ -19,12 +19,14 @@ import { glyphs, LEX } from '../robots/islandlang';
 import { luminance, brightTenth, hazeFor, hazeStyle } from './scrim';
 import { statusEn, firstEn, asLine, FIXED_EN, NAMES_EN } from './en';
 import { captionSender } from './captions';
-import { makeDirector } from './director';
+import { makeDirector, awake } from './director';
 import { chapter1 } from '../world/chapter1';
 import { chapter2 } from '../world/chapter2';
 import { chapterView, startCard, endCard, goneCard, chapter2View, startCard2, endCard2, chapterShown } from './chapter-line';
 import { makeCues, trialCue, gatherCue, type Cue } from './cues';
 import { B, bubbleLines, placeBubble, tipOnScreen, makeTalk, overlaps, type Place, type Rect } from './bubble';
+import { PLACES, HERE_M, placeWords, type PlaceId } from './fixed';
+import type { Pose } from './fleet';
 
 export interface LiveCtx {
   residents(): any | null;           // the island's residents, once the island is built
@@ -42,9 +44,14 @@ export interface LiveCtx {
   /** Where r's head is on the screen (px; the point over it the bubble's tail points at), and — sight asked — whether
    *  the camera on air sees it (BUBBLE.md §3). */
   headAt?(r: any, sight?: boolean): { x: number; y: number; front: boolean; on: boolean; seen: boolean } | null;
+  /** The fixed cameras there now (stage 2, src/live/fixed.ts): each place's subject and where its camera looks. */
+  places?(): { subj: { id: PlaceId; place: PlaceId; no: string }; at: Pose }[];
+  /** A place's things as the world has them now, for its band (fixed.ts placeWords). */
+  placeState?(id: PlaceId): { built: number; roofN: number; hutN: number; raft: { parts: number; n: number; away: boolean }; firing: boolean; boiling: boolean; drying: boolean; lit: boolean } | null;
 }
 /** The drone's number for each one it follows (01–04; 13 is the island round, later). */
 const DORON: Record<string, string> = { dot: '01', rakko: '02', kame: '03', lantern: '04' };
+const DORON_ORDER = Object.keys(DORON);
 export function makeLive(ctx: LiveCtx) {
   document.body.classList.add('live');
   // (?lang=en: the same window in English — the world's words turned on this side only: src/live/en.ts; ?captions=<url>:
@@ -76,10 +83,20 @@ export function makeLive(ctx: LiveCtx) {
     const line = en ? statusEn(trimStatus(text)) : trimStatus(text);   // (English the table does not have: no line, the name alone)
     const lines = line ? wrapStatus(en ? asLine(line) : line, fits) : [];
     status.innerHTML = lines.map((l) => `<span>${l.replace(/[<&]/g, (c) => (c === '<' ? '&lt;' : '&amp;'))}</span>`).join('');
-    $('.doron .n').textContent = DORON[r.id] ?? '13';
-    $('.band .who .name').textContent = nameOf(r);
-    $('.band .who .isl-name').innerHTML = islName(r);
-    ($('.band .who .line')).style.setProperty('--c', r.sp?.color ?? '#fff');
+    const pl = r.place ? PLACES.find((x) => x.id === r.place) : null;   // (a place's camera: its number and the place's name — MULTICAM.md §3-1)
+    $('.doron .n').textContent = pl?.no ?? DORON[r.id] ?? '13';
+    $('.band .who .name').textContent = pl ? (en ? pl.en : pl.ja) : nameOf(r);
+    $('.band .who .isl-name').innerHTML = pl ? (pl.isl ? glyphs([pl.isl], 'isl', 1.25) : '') : islName(r);
+    ($('.band .who .line')).style.setProperty('--c', pl ? 'var(--ink2)' : r.sp?.color ?? '#fff');
+  }
+  // A place's band (MULTICAM.md §3-1): those here (in the residents' order) — the first one's doing the line, who is here the
+  // small line; none here: the thing as it is now (fixed.ts placeWords); neither: the place's name alone.
+  const hereAt = (R: any, r: any) => { const a = ctx.places?.().find((p) => p.subj.id === r.id)?.at; return a ? DORON_ORDER.map((id) => R.list.find((x: any) => x.id === id)).filter((x: any) => x && Math.hypot(x.pos.x - a.lx, x.pos.z - a.lz) <= HERE_M && awake(x)) : []; };
+  function placeText(R: any, r: any): string {
+    const here = hereAt(R, r); if (here.length) return R.status(here[0]) as string;
+    const st = ctx.placeState?.(r.place); if (!st) return '';
+    const hr = ((ctx.clockMs() / 3.6e6 + ctx.tz()) % 24 + 24) % 24;
+    return placeWords(r.place, { ...st, here: [], night: hr < 5 || hr >= 18.5 });
   }
 
   const esc = (t: string) => t.replace(/[<&]/g, (c) => (c === '<' ? '&lt;' : '&amp;'));
@@ -87,6 +104,7 @@ export function makeLive(ctx: LiveCtx) {
   // (who is speaking, of the one followed and whoever it is with: the followed one, the one it talks with, or one
   // speaking near it at the fire)
   const speaker = (R: any, r: any) => {
+    if (r.place) return hereAt(R, r).find((x: any) => x.saying) ?? null;   // (a place on air: one of those here speaking)
     if (r.saying) return r;
     const o = r.talk ? (r.talk.a === r ? r.talk.b : r.talk.a) : null; if (o?.saying) return o;
     return R.list.find((x: any) => x !== r && x.saying && Math.hypot(x.pos.x - r.pos.x, x.pos.z - r.pos.z) < 20) ?? null;
@@ -212,7 +230,7 @@ export function makeLive(ctx: LiveCtx) {
     band.classList.toggle('dim', [cb, pb].some((b) => b?.place && !b.el.classList.contains('off') && overlaps(b.place, bandR)));
   }
 
-  const director = makeDirector({ residents: ctx.residents, watched: ctx.watched, watch: ctx.watch, cam: ctx.cam, speaking: () => talking, visible: ctx.visible, skip: ctx.skip });
+  const director = makeDirector({ residents: ctx.residents, watched: ctx.watched, watch: ctx.watch, cam: ctx.cam, speaking: () => talking, visible: ctx.visible, skip: ctx.skip, places: ctx.places });
   function update(dt: number) {
     const R = ctx.residents();
     if (!R) return;
@@ -226,8 +244,8 @@ export function makeLive(ctx: LiveCtx) {
     $('.when .time').textContent = localTimeString(ctx.clockMs(), ctx.tz());
     chapterLine(R);
     if (!r || ctx.bridging?.()) { band.classList.add('off'); return; }
-    trialLine(r);
-    const text = trimStatus(R.status(r) as string);   // (as it is shown: the metres still to go taken out, or the line would fade out and back with the same words each time they change — science, #121)
+    if (r.place) hereLine(R, r); else trialLine(r);
+    const text = trimStatus(r.place ? placeText(R, r) : (R.status(r) as string));   // (as it is shown: the metres still to go taken out, or the line would fade out and back with the same words each time they change — science, #121)
     if (r.id !== shownFor) {   // (another one followed: the band fades out, changes, fades in)
       band.classList.add('off'); shownFor = r.id; shownText = text; swapT = 0.6;
       setTimeout(() => { show(r, text); if (!subKey) band.classList.remove('off'); }, 600);
@@ -244,6 +262,15 @@ export function makeLive(ctx: LiveCtx) {
   // there are English words. Two lines at most (live.css).
   const TRIAL_K: Record<string, [string, string, boolean]> = { confirmed: ['確かめた', 'Confirmed', true], refuted: ['違っていた', 'Not so', false], done: ['やりとげた', 'Done', true], 'not-yet': ['まだ届かない', 'Not there yet', false], 'steps-done': ['やってみた', 'Tried it', false], failed: ['うまくいかなかった', "Didn't work", false] };
   let trialShown = '';
+  /** A place on air: who is here, small, in the trial line's place — 「ここにいる　ドット・カメマル」, a line of each one's colour. */
+  function hereLine(R: any, r: any) {
+    const here = hereAt(R, r), key = here.length ? `here|${r.id}|${here.map((x: any) => x.id).join(',')}` : '';
+    if (key === trialShown) return; trialShown = key;
+    if (!key) { trialEl.classList.add('off'); return; }
+    $('.band .trial .k').textContent = en ? 'Here' : 'ここにいる'; trialEl.classList.remove('gold');
+    $('.band .trial .t').innerHTML = here.map((x: any) => `<span class="here" style="--c:${x.sp?.color ?? '#fff'}">${esc(nameOf(x))}</span>`).join(en ? ', ' : '・');
+    trialEl.classList.remove('off');
+  }
   function trialLine(r: any) {
     const d = r?.tried, fresh = !!d?.text && ctx.clockMs() - d.at < 12e3, t = r?.trial;
     const k = fresh ? TRIAL_K[d.result] : t?.active ? (['試み', 'Trying', true] as [string, string, boolean]) : null;
