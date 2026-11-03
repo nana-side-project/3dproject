@@ -6,11 +6,12 @@
 //            stands on a clear side; the same answer each time; never in a tree's crown
 //   words    the house: nothing yet / being built / up to the roof / standing (the lamp at night); the beach: half
 //            lashed / here / out at sea; the fire: burning / drying; never a count
-//   event    something happens at the house while Dot works there: the house's camera, twelve seconds, then Dot again
-//            (no opening shot, the scene being there already); the same place again within two minutes: not (the
-//            opening shot of a scene counts)
+//   event    a piece put on at the house, no card: as work (rank 3), no cut for it (MULTICAM.md §2-1 from here on)
 //   open     going to one at work by a place from far off: the place eight seconds first, then the one there
-//   round    all at rest: the residents awake and the places in turn, 75 s each
+//   first    a first of the island's at the house: the card's eight seconds on the house, then Dot (rank 1)
+//   gather   the fire's gathering: the house's wide shot while it lasts, one shot; ended, elsewhere
+//   work     long work by the house: the house and Dot in turn, 35 s each; after three minutes, the next one at work
+//   round    all at rest: the residents awake with the places between them, 75 s each — never a place after a place
 //   rank 1   a moment decided cuts in on a place on air
 // Usage: npx tsx --import ./scripts/node-assets.mjs scripts/fixed-check.ts
 import { placeSpots, placesOn, placeFixed, placeWords, panAt } from '../src/live/fixed';
@@ -51,48 +52,60 @@ const solids = (list: Solid[]) => ({ each: (x: number, z: number, rad: number, f
     `words: ${w.map((x) => x || '（名前だけ）').join(' / ')}`);
 }
 
-// the director with places: four stand-ins, the house at the origin
-const mk = (id: string, kind: string, x: number, z: number) => ({ id, act: 'idle', task: kind ? { kind, arrived: true } : null, talk: null as any, saying: '', pos: { x, y: 1, z } });
-const dot = mk('dot', 'build', 3, 2), rakko = mk('rakko', 'gather', 300, 40), kame = mk('kame', 'graze', -200, 90), lantern = mk('lantern', 'rest', 150, -260);
-const R = { list: [dot, rakko, kame, lantern], mind: () => null };
+// the director with places — each case a director of its own, the house at the origin, the beach far off
+const mk = (id: string, kind: string, x: number, z: number) => ({ id, act: 'idle', task: kind ? { kind, arrived: true } : null as any, talk: null as any, saying: '', pos: { x, y: 1, z } });
 const subj = (id: string, no: string) => ({ id, place: id, no });
 const HOUSE = subj('house', '06'), BEACH = subj('beach', '07');
-let placeList = [{ subj: HOUSE, at: { lx: 0, lz: 0 } }, { subj: BEACH, at: { lx: 300, lz: 30 } }];
-let watched: any = null, t = 0;
-const cams: { t: number; who: string; pri: number; kind: string; why: string }[] = [];
-const D = makeDirector({ residents: () => R, watched: () => watched, watch: (r) => { watched = r; }, speaking: () => false, cam: (who, pri, kind, why) => cams.push({ t, who, pri, kind, why }), places: () => placeList });
-const run = (s: number) => { for (let i = 0; i < s * 10; i++) { t += 0.1; D.tick(0.1); } };
-run(0.2);
-{ // event
-  const start = watched?.id; run(125);   // (on Dot, at work at the house: the opening shot of the house past its two minutes)
-  const before = watched?.id; D.event('house', 'ドットが小屋に柱を立てた', dot); run(1); const on = watched?.id, k = cams.at(-1)?.kind;
-  run(12.5); const back = watched?.id;
-  D.event('house', 'ドットが小屋に梁を渡した', dot); run(1); const again = watched?.id;
-  row(before === 'dot' && on === 'house' && k === 'place' && back === 'dot' && again === 'dot', `event: on ${before} (began ${start}); the house's event → ${on} (${k}); 12 s → ${back}; again within 2 min → ${again}`);
+type Cam = { t: number; who: string; pri: number; kind: string; why: string };
+function stage(list: any[], places = [{ subj: HOUSE, at: { lx: 0, lz: 0 } }, { subj: BEACH, at: { lx: 300, lz: 30 } }], start: any = null) {
+  const R = { list, mind: () => null }, cams: Cam[] = [];
+  let w: any = start, t = 0;
+  const D = makeDirector({ residents: () => R, watched: () => w, watch: (r) => { w = r; }, speaking: () => false, cam: (who, pri, kind, why) => cams.push({ t, who, pri, kind, why }), places: () => places });
+  return { D, cams, on: () => w?.id as string, set: (r: any) => { w = r; }, run: (s: number) => { for (let i = 0; i < s * 10; i++) { t += 0.1; D.tick(0.1); } }, until: (f: () => boolean, s = 120) => { for (let i = 0; i < s * 10 && !f(); i++) { t += 0.1; D.tick(0.1); } }, time: () => t };
 }
-{ // open (a director of its own, nothing shown yet: Rakko on air far off and at rest, Dot at work by the house)
-  const d2 = mk('dot', 'build', 3, 2), r2 = mk('rakko', 'rest', 300, 40), k2 = mk('kame', 'sleep', -200, 90), l2 = mk('lantern', 'sleep', 150, -260);
-  k2.act = 'sleep'; l2.act = 'sleep';
-  const R2 = { list: [d2, r2, k2, l2], mind: () => null }, c2: typeof cams = [];
-  let w2: any = r2, t2 = 0;
-  const D2 = makeDirector({ residents: () => R2, watched: () => w2, watch: (r) => { w2 = r; }, speaking: () => false, cam: (who, pri, kind, why) => c2.push({ t: t2, who, pri, kind, why }), places: () => [{ subj: HOUSE, at: { lx: 0, lz: 0 } }] });
-  for (let i = 0; i < 300; i++) { t2 += 0.1; D2.tick(0.1); }
-  const seq = c2.map((c) => `${c.who}:${c.kind}`), iH = c2.findIndex((c) => c.who === 'house'), toDot = c2.slice(iH + 1).find((c) => c.who === 'dot');
-  row(iH >= 0 && /場所から/.test(c2[iH].why) && !!toDot && Math.abs(toDot.t - c2[iH].t - 8) < 1.2, `open: ${seq.join(' → ')}; the house ${(toDot && toDot.t - c2[iH].t)?.toFixed(1)} s before Dot`);
+{ // event (a piece put on, no card: as work — no cut for it)
+  const dot = mk('dot', 'build', 3, 2), S = stage([dot, mk('kame', 'graze', -200, 90)]);
+  S.run(12); const first = S.cams.map((c) => c.who).join('→');   // (the opening of the house, then Dot)
+  S.D.event('house', 'ドットが小屋に柱を立てた', dot); S.run(1); const on = S.on();
+  row(first === 'house→dot' && on === 'dot', `event: began ${first}; a piece put on at the house → still ${on}`);
+}
+{ // open
+  const d = mk('dot', 'build', 3, 2), r = mk('rakko', 'rest', 300, 40), S = stage([d, r, { ...mk('kame', 'sleep', -200, 90), act: 'sleep' }], undefined, r);
+  S.run(30);
+  const seq = S.cams.map((c) => `${c.who}:${c.kind}`), iH = S.cams.findIndex((c) => c.who === 'house'), toDot = S.cams.slice(iH + 1).find((c) => c.who === 'dot');
+  row(iH >= 0 && /場所から/.test(S.cams[iH].why) && !!toDot && Math.abs(toDot.t - S.cams[iH].t - 8) < 1.2, `open: ${seq.join(' → ')}; the house ${(toDot && toDot.t - S.cams[iH].t)?.toFixed(1)} s before Dot`);
+}
+{ // first
+  const dot = mk('dot', 'build', 3, 2), S = stage([dot, mk('kame', 'graze', -200, 90)]);
+  S.run(15); const before = S.on();
+  S.D.event('house', 'ドットが小屋の屋根を葺き終えた', dot, { milestone: 'hut' }); S.run(1);
+  const on = S.on(), why = S.cams.at(-1)?.why ?? '', at = S.time(); S.until(() => S.on() === 'dot', 20);
+  row(before === 'dot' && on === 'house' && /初めて/.test(why) && Math.abs(S.time() - at - 7.5) < 1.5 && S.cams.at(-1)?.pri === 1, `first: on ${before}; a first at the house → ${on} (${why.slice(0, 12)}…), then ${S.on()} after ${(S.time() - at + 1).toFixed(1)} s (rank ${S.cams.at(-1)?.pri})`);
+}
+{ // gather
+  const dot = mk('dot', 'fire', 3, 2), rakko = mk('rakko', 'fire', 4, 3), S = stage([dot, rakko, mk('kame', 'graze', -200, 90)]);
+  dot.saying = 'きょうは流木が多かったね';
+  S.run(60); const during = S.on(), rows = S.cams.length;
+  dot.task = { kind: 'build', arrived: true }; rakko.task = { kind: 'gather', arrived: true }; dot.saying = '';
+  S.run(30); const after = S.on();
+  row(during === 'house' && S.cams.filter((c) => c.who === 'house').length === 1 && rows <= 2 && after !== 'house', `gather: the fire's gathering → ${during} for a minute in one shot (${rows} rows); ended → ${after}`);
+}
+{ // work
+  const dot = mk('dot', 'build', 3, 2), S = stage([dot, mk('kame', 'graze', -200, 90)]);
+  S.run(200); const seq = S.cams.map((c) => c.who), gaps = S.cams.slice(1).map((c, i) => c.t - S.cams[i].t);
+  const iK = seq.indexOf('kame'), turns = seq.slice(0, iK < 0 ? seq.length : iK);
+  row(turns.length >= 5 && turns.every((w, i) => w === (i % 2 ? 'dot' : 'house')) && gaps.slice(1, turns.length - 1).every((g) => g > 33 && g < 37) && iK > 0 && S.cams[iK].t > 175,
+    `work: ${seq.join(' → ')}; each ${gaps.map((g) => g.toFixed(0)).join(', ')} s; the next at work after ${iK > 0 ? S.cams[iK].t.toFixed(0) : '—'} s`);
 }
 { // round
-  for (const r of R.list) r.task = { kind: 'rest', arrived: true } as any;
-  cams.length = 0; run(400);
-  const who = cams.map((c) => c.who), gaps = cams.slice(1).map((c, i) => c.t - cams[i].t);
-  row(who.includes('house') && who.includes('beach') && who.includes('dot') && gaps.slice(1).every((g) => g > 70 && g < 80), `round: ${who.join(' → ')}; each ${gaps.map((g) => g.toFixed(0)).join(', ')} s (the first from part way)`);
+  const L = ['dot', 'rakko', 'kame', 'lantern'].map((id, i) => mk(id, 'rest', 100 + i * 80, -100)), S = stage(L);
+  S.run(500); const who = S.cams.map((c) => c.who), gaps = S.cams.slice(1).map((c, i) => c.t - S.cams[i].t), placeTwice = who.some((w, i) => i > 0 && ['house', 'beach'].includes(w) && ['house', 'beach'].includes(who[i - 1]));
+  row(who.includes('house') && who.includes('beach') && !placeTwice && gaps.slice(1).every((g) => g > 70 && g < 80), `round: ${who.join(' → ')}; each ${gaps.map((g) => g.toFixed(0)).join(', ')} s`);
 }
-{ // rank 1 (a director of its own: on the house's camera after something happened there)
-  const d3 = mk('dot', 'build', 3, 2), k3 = mk('kame', 'graze', -200, 90), R3 = { list: [d3, k3], mind: () => null }, c3: typeof cams = [];
-  let w3: any = null, t3 = 0;
-  const D3 = makeDirector({ residents: () => R3, watched: () => w3, watch: (r) => { w3 = r; }, speaking: () => false, cam: (who, pri, kind, why) => c3.push({ t: t3, who, pri, kind, why }), places: () => [{ subj: HOUSE, at: { lx: 0, lz: 0 } }] });
-  const go = (s: number) => { for (let i = 0; i < s * 10; i++) { t3 += 0.1; D3.tick(0.1); } };
-  go(200); D3.event('house', 'ドットが小屋に板を張った', d3); go(1); const on = w3?.id;
-  D3.trial(k3, 'confirmed', '藻場で食べた'); go(1); const cut = w3?.id;
-  row(on === 'house' && cut === 'kame' && c3.at(-1)?.pri === 1, `rank 1: on ${on}; a moment decided → ${cut} (${c3.at(-1)?.kind})`);
+{ // rank 1 (on the house's camera in turn with Dot at work)
+  const dot = mk('dot', 'build', 3, 2), kame = mk('kame', 'graze', -200, 90), S = stage([dot, kame], [{ subj: HOUSE, at: { lx: 0, lz: 0 } }]);
+  S.run(20); S.until(() => S.on() === 'house', 40); const on = S.on();
+  S.D.trial(kame, 'confirmed', '藻場で食べた'); S.run(1);
+  row(on === 'house' && S.on() === 'kame' && S.cams.at(-1)?.pri === 1, `rank 1: on ${on}; a moment decided → ${S.on()} (${S.cams.at(-1)?.kind})`);
 }
 process.exit(fail ? 1 : 0);

@@ -252,7 +252,12 @@ function placesNow(): PlaceId[] {
   const now = performance.now(); if (now - fixedCams.onAt < 4000) return fixedCams.on;
   fixedCams.onAt = now; const w = placeWorld(); if (!w) return (fixedCams.on = []);
   const spots = placeSpots({ hut: w.pl.hut, pit: w.pl.pit, plots: w.pl.plots, raft: w.v.raft, fired: w.fired }, (x, z) => cur!.T.h(x, z));
-  return (fixedCams.on = placesOn(spots).map((p) => p.id).filter((id) => !!fixedPose(id, spots[id])));
+  // (MULTICAM.md §2-1: at night, none before a lamp burns, and then only the house — its lamp; none whose thing is hidden
+  // from it, its middle or its top — a house or a tree grown since it was put)
+  const hr = ((clock.ms / 3.6e6 + (cur?.loc.tz ?? 9)) % 24 + 24) % 24, night = hr < 5 || hr >= 18.5;
+  if (night && !w.lit) return (fixedCams.on = []);
+  const T = cur!.T, seen = (p: Pose) => lineClear(p, { x: p.lx, y: p.ly, z: p.lz }, T, T.solids) && lineClear(p, { x: p.lx, y: p.ly + 1.5, z: p.lz }, T, T.solids);
+  return (fixedCams.on = placesOn(spots).map((p) => p.id).filter((id) => (!night || id === 'house') && (() => { const p = fixedPose(id, spots[id]); return !!p && seen(p); })()));
 }
 /** Where the place's camera stands: as first put on this island, else put now (and kept). */
 function fixedPose(id: PlaceId, spot?: { x: number; y: number; z: number } | null): Pose | null {
