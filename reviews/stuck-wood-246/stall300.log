@@ -1,0 +1,8 @@
+run: 300 h from 2026-11-12T08:00:00+09:00, rand seed 2; errors 0; firewood wanted 20 h of it (17.5 h before the hut was up)
+driftwood set down by the bench 1 times, taken up again 1, lying there at the end 0; Dot at the end fire, holding wood
+firsts: sighting 0.3h, clay-pit 14.1h, fibre 25.7h, raft 25.9h, mast 28.4h, hut 51.8h, south-load 52.2h, crossing:sopunu 52.2h, sail 80.6h, pier 102.9h, dry-wood 112.6h, rope 119.7h, rig 123.1h, lash 125.8h, sail-crossing 128.1h
+firewood lots at the end (kg; * reserved): green 29.1 6.7 8.8 10.7 7.3 11.2 8.6 9.1; seasoned 48.9; trees felled 16
+ready in the lab at the end: p10x_clay_slake; Lantern fire
+at the end: pots green/dry/fired 0/2/0; firewood green 91.6 kg, seasoned 48.9 kg; runs m02x_air_barometer_test:running
+the hut up, the longest time firewood was wanted with no step to get wood ready for Dot: 0.0 h — PASS
+exit 0

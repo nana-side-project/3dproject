@@ -1,0 +1,11 @@
+probe 84 h: pots dry_pot(crack 0, shelf) dry_pot(crack 0, shelf); firewood 67.7kg w450k shelf* 29.1kg w450k shelf; ready —; equipment eq:fixture_air_barometer eq:clay_pit eq:fixture_coconut_tools eq:fixture_bench eq:drying_rack eq:drying_rack#2 eq:firewood_stack; runs m02x_air_barometer_test:running p15x_firewood_dry:running; Lantern fire/sit 3773/1000000000 s to (66.8, -146.7) at (67.1, 1.8, -146.7), ground 1.8, went arrived, blocked 0.0, path -
+probe 88 h: pots dry_pot(crack 0, shelf) dry_pot(crack 0, shelf); firewood 67.7kg w450k shelf* 29.1kg w450k shelf; ready —; equipment eq:fixture_air_barometer eq:clay_pit eq:fixture_coconut_tools eq:fixture_bench eq:drying_rack eq:drying_rack#2 eq:firewood_stack; runs m02x_air_barometer_test:running p15x_firewood_dry:running; Lantern base/carry 1201/6 s to (43.7, -86.4) at (42.8, 1.0, -85.6), ground 0.6, went arrived, blocked 0.0, path -
+probe 92 h: pots dry_pot(crack 0, shelf) dry_pot(crack 0, shelf); firewood 67.7kg w450k shelf* 29.1kg w450k shelf; ready —; equipment eq:fixture_air_barometer eq:clay_pit eq:fixture_coconut_tools eq:fixture_bench eq:drying_rack eq:drying_rack#2 eq:firewood_stack; runs m02x_air_barometer_test:running p15x_firewood_dry:running; Lantern base/carry 1193/6 s to (43.7, -86.4) at (42.8, 1.0, -85.6), ground 0.6, went arrived, blocked 0.0, path -
+run: 100 h from 2026-11-12T08:00:00+09:00, rand seed 2; errors 0; firewood wanted 20 h of it (17.5 h before the hut was up)
+driftwood set down by the bench 1 times, taken up again 0, lying there at the end 1; Dot at the end shelter, holding wood
+firsts: sighting 0.3h, clay-pit 14.1h, fibre 25.7h, raft 25.9h, mast 28.4h, hut 51.8h, south-load 52.2h, crossing:sopunu 52.2h, sail 80.6h
+firewood lots at the end (kg; * reserved): green 67.7* 29.1; seasoned —; trees felled 9
+ready in the lab at the end: —; Lantern shelter
+at the end: pots green/dry/fired 0/2/0; firewood green 96.9 kg, seasoned 0 kg; runs m02x_air_barometer_test:running p15x_firewood_dry:running
+the hut up, the longest time firewood was wanted with no step to get wood ready for Dot: 0.0 h — PASS
+exit 0

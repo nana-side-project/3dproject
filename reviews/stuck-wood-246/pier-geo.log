@@ -1,0 +1,2 @@
+PIER deck 4 bases 3 pos { t: 0.27, side: 0.55 } onDeck(pos) true target { t: -0.8, side: 0 } onDeck(target) false landing [ '43.94', '-86.96' ] { t: -1.4, side: 0 } G(landing) 0.94 goal {
+exit 0
