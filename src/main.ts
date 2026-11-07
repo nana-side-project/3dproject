@@ -55,7 +55,7 @@ import { STAGES } from './robots/voices';
 import { aiKey, setAiKey, aiLastError } from './robots/mind';
 import { setAnisotropy, SURFACE, SURF_UNIFORMS } from './render/surface';
 import { TIERS, TIER_ORDER, detectTier, type Tier } from './quality';
-import { cue, speaking, soundStream, audio, audioState, startAudio, stopAudio, pauseAudio, setShore, setHum, setMotor, crunch, setWhaleSong, setMood, setMusic, setRain, setWind, setSea, thunder, splash, breachSound, breachRise, renderLeap, setAir, frenzy, plop, blow, vol, setVolume, babble, lumauVoice, voices, setVoices } from './audio';
+import { cue, speaking, soundStream, audio, audioState, startAudio, stopAudio, pauseAudio, setShore, setLiveSound, setMusicRest, setHum, setMotor, crunch, setWhaleSong, setMood, setMusic, setRain, setWind, setSea, thunder, splash, breachSound, breachRise, renderLeap, setAir, frenzy, plop, blow, vol, setVolume, babble, lumauVoice, voices, setVoices } from './audio';
 import { makePov } from './ui/pov';
 import { makeDiaryBook } from './ui/diary';
 import { makeLanternStudyPanel } from './ui/lantern-study';
@@ -84,6 +84,7 @@ const noPost = /[?&]nopost/.test(location.search), noPip = /[?&]nopip/.test(loca
 // ?live: the 24-hour stream (src/live/live.ts): straight into the island, the app's own controls put away, the drone
 // following each resident in turn, the observation window over it; the island on its own clock (now, as it is)
 const live = /[?&]live\b/.test(location.search);
+if (live) setLiveSound(true);   // (the live screen's sound rules: TRIAL6.md §2)
 // A new island (D36/D37: the trials on a new island and December's): ?newisland=<today's date, JST, YYYY-MM-DD> — before the
 // island is made, the one kept in this browser is put away (written out first by hand: seaglassRehearsal.saveOut(),
 // docs/rehearsal/RUNBOOK.md) and the island's calendar starts now, on island June 1st of year 1. With a time,
@@ -227,7 +228,7 @@ const watch = { r: null as any, place: null as null | PlaceId, sky: null as null
 // The drone fleet on the live screen (ADR 0010, stage 1; src/live/fleet.ts): a resident's camera is cut to, not flown to —
 // within NEAR_M, straight; further, through the sky for 3–5 s, the way there made ready meanwhile. Whether a resident's
 // camera sees it is asked twice a second at most. Only the picture: nothing of it reaches a resident.
-const fleet = { bridge: null as null | { to: any; until: number; sky: Pose }, seen: new Map<string, { at: number; ok: boolean }>() };
+const fleet = { bridge: null as null | { to: any; until: number; sky: Pose; dest?: { x: number; z: number } }, seen: new Map<string, { at: number; ok: boolean }>() };
 function fleetCam(r: any) { const T = cur!.T; return camFor(r, T, T.solids, watch.r === r ? watch.off : CAM_OFF); }
 // The fixed cameras (stage 2, MULTICAM.md §1; src/live/fixed.ts): one for each of the island's places that is there now —
 // the house (the hut's place, from the first day), the beach (the raft), the firing ground, the field — three at most.
@@ -379,14 +380,14 @@ function fleetCut(r: any) {
   // (asked for another while the sky is up: the sky stays as it is, only where it goes changes — no jump from sky to sky;
   // viewer design on #228)
   if (fleet.bridge) {
-    if (fleet.bridge.to !== r) { const q = subjPose(r); if (!q) return; fleet.bridge.to = r; cur.shore?.repack?.(new THREE.Vector3(q.x, q.y, q.z)); rehearsal?.event('cam-sky', `→ ${DORON[r.id] ?? '13'}`, true); }
+    if (fleet.bridge.to !== r) { const q = subjPose(r); if (!q) return; fleet.bridge.to = r; fleet.bridge.dest = { x: q.x, z: q.z }; cur.shore?.repack?.(new THREE.Vector3(q.x, q.y, q.z)); rehearsal?.event('cam-sky', `→ ${DORON[r.id] ?? '13'}`, true); }
     return;
   }
   const p = subjPose(r); if (!p) return;
   // (near, or to or from the sky's own camera: straight — it is the sky already)
   if (r.sky || watch.sky || !watch.r || hyp(p.x - drone.pos.x, p.z - drone.pos.z) <= NEAR_M) { fleetCutNow(r, p); return; }
   // (far: up into the sky over the way, the way there made ready — the shore's plants packed round where it goes)
-  fleet.bridge = { to: r, until: performance.now() + rr(3000, 5000), sky: skyPose(drone.pos, { x: p.x, y: p.y, z: p.z }, cur.T) };
+  fleet.bridge = { to: r, until: performance.now() + rr(3000, 5000), sky: skyPose(drone.pos, { x: p.x, y: p.y, z: p.z }, cur.T), dest: { x: p.x, z: p.z } };
   fleetPlace(fleet.bridge.sky);
   cur.T.ghosts?.cut(camera.position, null);   // (from the sky, nothing is seen through)
   cur.shore?.repack?.(new THREE.Vector3(p.x, p.y, p.z));
@@ -2491,12 +2492,15 @@ function enterOcean(oc: Ocean, writeUrl = true) {
     oc.residents.onEvent = (k: string, text: string, r: any, meta?: { milestone?: string; trial?: any }) => { seaLog('robot', text, () => r.pos); liveUi?.event(k, text, r, meta); if (meta?.trial) rehearsal?.trial(r.id, meta.trial); };
     // their voices, when the camera is close enough to hear them
     oc.residents.onSay = (r: any, text: string) => {
-      const d = camera.position.distanceTo(r.pos); if (d > 40) return;
+      const d = camera.position.distanceTo(r.pos); if (d > (live ? 120 : 40)) return;
       _w.subVectors(r.pos, camera.position).normalize();
       const right = new THREE.Vector3(Math.cos(drone.yaw), 0, -Math.sin(drone.yaw));
       // (a line in the island's words: said in its own voice; anything else: the old babble)
-      const loud = Math.min(1, 1.3 / (1 + d * 0.12)) * (overSea(camera.position) > 0 || overSea(r.pos) < 0 ? 1 : 0.4);
-      if (r.sayIsl) lumauVoice(r.id, r.sayIsl, loud, _w.dot(right)); else babble(r.id, text, loud, _w.dot(right));
+      let loud = Math.min(1, 1.3 / (1 + d * 0.12)) * (overSea(camera.position) > 0 || overSea(r.pos) < 0 ? 1 : 0.4), pan = _w.dot(right);
+      // (the live screen: a voice as loud however far the camera is — a fixed camera's wide shot too, as the bubbles keep
+      // their size — and to the side the speaker is on the screen; TRIAL6.md §2)
+      if (live) { loud = 0.8; const v = _w.copy(r.pos).project(camera); pan = Math.max(-0.8, Math.min(0.8, v.x)); }
+      if (r.sayIsl) lumauVoice(r.id, r.sayIsl, loud, pan); else babble(r.id, text, loud, pan);
       if (!guideEl.hidden && (panelTab === 'talk' || panelTab === 'island')) renderGuide();
     };
   }
@@ -3924,10 +3928,15 @@ function frameBody(ts: number) {
     const far = air ? 90000 : 460;
     if (camera.far !== far) { camera.far = far; camera.updateProjectionMatrix(); }
     setAir(air);
+    // (live: while a gathering is on — two or more by the fire, the morning's talk or the evening's — the music rests: the
+    // voices and the fire only; TRIAL6.md §2)
+    if (live) setMusicRest((cur.residents?.list ?? []).filter((r: any) => r.task?.kind === 'fire' && r.task.arrived).length >= 2);
     // ashore, the waves sound further off the further it is from the sea (looked for in rings, now and then)
     if ((shoreT -= dt) < 0) {
-      shoreT = 0.5;
-      const f = cur.loc.land ? cur.loc.f : null, x = camera.position.x, z = camera.position.z;
+      shoreT = live ? 0.15 : 0.5;
+      // (live: across the sky's bridge, the place it goes to is heard before it is seen — TRIAL6.md §2)
+      const to = live && fleet.bridge ? fleet.bridge.dest : null;
+      const f = cur.loc.land ? cur.loc.f : null, x = to ? to.x : camera.position.x, z = to ? to.z : camera.position.z;
       let dist = 0;
       if (f && f(x, z) > -0.3) {
         dist = 320;
