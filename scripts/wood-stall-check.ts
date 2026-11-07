@@ -7,6 +7,10 @@
 // felled (fell), the driftwood set down by the bench taken up (woodtake) — is ready for Dot. Never twelve hours or more
 // without one. Also told: how often the driftwood was set down by the bench and taken up again, what lies there at the
 // end, the firsts reached, and the pots, the wood and the runs at the end.
+// And no one stands still on its way somewhere (science on #221, 11/4 — on the same island, Lantern on the pier's deck with a
+// stone for the shore was sent back to the landing every step from 88 h on, and stood there for hours, half an hour to a
+// task): every half hour, each one walking to a task, where it is; never three hours or more without getting half a metre
+// on. The pier's foundation stones laid are told, and when.
 // Usage: npx tsx --import ./scripts/node-assets.mjs scripts/wood-stall-check.ts   (HOURS, SEED, START to change the run)
 import './node-land';
 import * as THREE from 'three';
@@ -31,6 +35,11 @@ R.setBrain(async (i: any) => { const o = (i.options ?? []).filter((x: any) => x.
 const HOURS = Number(process.env.HOURS ?? 300), STALL_H = 12, cam = new THREE.Vector3(0, 50, 0), t0 = now;
 const dot = R.list.find((r: any) => r.id === 'dot'), hrs = (ms: number) => +((ms - t0) / 3.6e6).toFixed(1);
 let errors = 0, since = -1, worst = { len: 0, from: 0, why: '', holding: '' }, wantedHalfHours = 0, beforeHut = 0, ups = 0, downs = 0, lastBench = 0;
+// (standing still on the way to a task: each one's place at the last half hour it was walking, and how many half hours since
+// without getting half a metre on; the longest)
+const STILL_H = 3, onWay: Record<string, { x: number; z: number; n: number; from: number } | undefined> = {};
+let still = { len: 0, who: '', from: 0, kind: '', x: 0, z: 0 }, lastBases = R.village.bases ?? 0;
+const basesAt: string[] = [];
 const hutN: number = R.places().hutN;
 const GETS = /^(fuel|fell|woodtake):/;
 // (PROBE_AT=h,h,…: at those hours, the pots, the firewood lots and what the lab has ready — to see why a fire waits)
@@ -44,10 +53,16 @@ for (let s = 0; s < HOURS * 3600; s++) {
   for (const r of R.list) if (!r.sp.living) r.battery = Math.max(r.battery, 0.3);
   if (s % 7200 === 0) for (const b of R.beds ?? []) regrowBed(b, now);
   { const b = R.village.benchWood ?? 0; if (b > lastBench) ups += b - lastBench; else if (b < lastBench) downs += lastBench - b; lastBench = b; }
+  if ((R.village.bases ?? 0) !== lastBases) { lastBases = R.village.bases ?? 0; basesAt.push(`${lastBases} at ${hrs(now)} h`); }
   if (probeAt.length && s % 3600 === 0 && probeAt.includes(s / 3600)) probe(s / 3600);
   if (s % 1800 === 0) {
     const why: string = R.woodWanted(), hut = dot.stats.built >= hutN, opts: any[] = why && hut ? R.talkDev.optionsFor(dot, R.talkDev.agentOf(dot)) : [];
     const got = !why || !hut || opts.some((o) => GETS.test(o.id) && o.ready !== false);
+    for (const r of R.list) {
+      const walking = !!r.task && !r.task.arrived && r.model.root.visible !== false, w = onWay[r.id];   // (not out on a crossing)
+      if (walking && w && Math.hypot(r.pos.x - w.x, r.pos.z - w.z) < 0.5) { w.n++; if (w.n / 2 > still.len) still = { len: w.n / 2, who: r.id, from: w.from, kind: r.task.kind, x: r.pos.x, z: r.pos.z }; }
+      else onWay[r.id] = walking ? { x: r.pos.x, z: r.pos.z, n: 0, from: hrs(now) } : undefined;
+    }
     if (why) wantedHalfHours++;
     if (why && !hut) beforeHut++;
     if (got) since = -1;
@@ -65,6 +80,8 @@ const lots = (f: (l: any) => boolean) => L.filter((l) => fw(l) && f(l)).map((l) 
 console.log(`firewood lots at the end (kg; * reserved): green ${lots((l) => !dry(l)) || '—'}; seasoned ${lots(dry) || '—'}; trees felled ${(V.felled ?? []).length}`);
 console.log(`ready in the lab at the end: ${(R.labReady?.() ?? []).join(' ') || '—'}; Lantern ${(() => { const ln = R.list.find((r: any) => r.id === 'lantern'); return `${ln.task?.kind ?? ln.act}`; })()}`);
 console.log(`at the end: pots green/dry/fired ${['green_pot', 'dry_pot', 'fired_pot'].map((m) => L.filter((l) => l.materialId === m).length).join('/')}; firewood green ${kg((l) => fw(l) && !dry(l))} kg, seasoned ${kg((l) => fw(l) && dry(l))} kg; runs ${V.labRuns.map((x: any) => `${x.processId}:${R.lab.runs[x.runId]?.status}`).join(' ') || '—'}`);
-const ok = worst.len < STALL_H && errors === 0;
-console.log(`the hut up, the longest time firewood was wanted with no step to get wood ready for Dot: ${worst.len.toFixed(1)} h${worst.len ? ` (from ${worst.from} h, ${worst.why}, holding ${worst.holding})` : ''} — ${ok ? 'PASS' : 'FAIL'}`);
+console.log(`the pier's foundation stones laid: ${basesAt.join(', ') || 'none'} (pier ${V.pier ?? '-'}, ${V.bases ?? 0} stones, ${V.posts ?? 0} posts, ${V.deck ?? 0} planks)`);
+const woodOk = worst.len < STALL_H && errors === 0, stillOk = still.len < STILL_H, ok = woodOk && stillOk;
+console.log(`the hut up, the longest time firewood was wanted with no step to get wood ready for Dot: ${worst.len.toFixed(1)} h${worst.len ? ` (from ${worst.from} h, ${worst.why}, holding ${worst.holding})` : ''} — ${woodOk ? 'PASS' : 'FAIL'}`);
+console.log(`the longest anyone stood still on its way to a task (under half a metre on, half-hourly): ${still.len.toFixed(1)} h${still.len ? ` (${still.who}, from ${still.from} h, ${still.kind}, at (${still.x.toFixed(1)}, ${still.z.toFixed(1)}))` : ''} — ${stillOk ? 'PASS' : 'FAIL'}`);
 process.exit(ok ? 0 : 1);
