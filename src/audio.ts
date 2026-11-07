@@ -15,6 +15,7 @@ export function soundStream(): MediaStream | null {
   if (!recDest) { recDest = ac.createMediaStreamDestination(); outTap.connect(recDest); }
   return recDest.stream;
 }
+let musicRest: GainNode | null = null, ambTau = 1.2, airTau = 0.4;
 let master: GainNode, natureBus: GainNode, musicBus: GainNode, reverb: ConvolverNode, crackleGain: GainNode, motion: GainNode, motor: GainNode, rotor: OscillatorNode[] = [], bedGain: GainNode;
 const timers: Record<string, number> = {};
 export const audio = { on: false, music: true, night: 0, twilight: 0, phase: 'noon', sea: '' };
@@ -78,8 +79,10 @@ function build() {
 
   musicBus = ac.createGain(); musicBus.gain.value = audio.music ? curve(vol.music) : 0;
   const musicDry = ac.createGain(); musicDry.gain.value = 0.35;
-  musicBus.connect(musicDry).connect(master);
-  musicBus.connect(reverb);
+  // (the music's rest: during a gathering, only voices and the fire — TRIAL6.md §2)
+  musicRest = ac.createGain(); musicRest.gain.value = 1; musicBus.connect(musicRest);
+  musicRest.connect(musicDry).connect(master);
+  musicRest.connect(reverb);
 
   natureBus = ac.createGain(); natureBus.gain.value = curve(vol.nature);
   natureBus.connect(master);
@@ -171,6 +174,14 @@ export function setVolume(v: Partial<typeof vol>) {
   if (audio.on) master.gain.setTargetAtTime(0.85 * curve(vol.all), t, 0.08);
   musicBus.gain.setTargetAtTime(audio.music ? curve(vol.music) : 0, t, 0.08);
   natureBus.gain.setTargetAtTime(curve(vol.nature), t, 0.08);
+}
+/** The live screen's sound rules (TRIAL6.md §2): its cuts change place at once, so the place's sounds cross over in
+ *  half a second (not the drone's slow fades); the music rests while a gathering is on. */
+export function setLiveSound(on: boolean) { ambTau = on ? 0.17 : 1.2; airTau = on ? 0.17 : 0.4; }
+export function setMusicRest(rest: boolean) {
+  if (!ac || !musicRest) return;
+  const want = rest ? 0 : 1;
+  musicRest.gain.setTargetAtTime(want, ac.currentTime, 1.5);
 }
 export function setMood(o: { phase: string; night: number; twilight: number; sea: string }) {
   audio.phase = o.phase; audio.night = o.night; audio.twilight = o.twilight; audio.sea = o.sea;
@@ -579,7 +590,7 @@ export function setSea(wave: number) {
 export function setShore(k: number) {
   if (Math.abs(k - shoreK) < 0.01) return;
   shoreK = k;
-  if (seaGain && ac) seaGain.gain.setTargetAtTime(0.35 * k * seaK, ac.currentTime, 1.2);
+  if (seaGain && ac) seaGain.gain.setTargetAtTime(0.35 * k * seaK, ac.currentTime, ambTau);
 }
 export function setAir(on: boolean) {
   if (!ac || on === inAir) return;
@@ -609,8 +620,8 @@ export function setAir(on: boolean) {
     sea.connect(slp).connect(sg).connect(seaGain).connect(airGain); sea.start();
   }
   const t = ac.currentTime;
-  airGain.gain.setTargetAtTime(on ? 0.2 : 0, t, 0.4);   // (wind and waves about as loud as the sea's hush below: no jump at the surface)
-  bedGain.gain.setTargetAtTime(on ? 0 : 0.12 + 0.04 * (1 - audio.night), t, 0.4);
+  airGain.gain.setTargetAtTime(on ? 0.2 : 0, t, airTau);   // (wind and waves about as loud as the sea's hush below: no jump at the surface)
+  bedGain.gain.setTargetAtTime(on ? 0 : 0.12 + 0.04 * (1 - audio.night), t, airTau);
   crackleGain.gain.setTargetAtTime(0, t, 0.3);
 }
 
