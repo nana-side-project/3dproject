@@ -1,0 +1,11 @@
+run: 300 h from 2026-11-12T08:00:00+09:00, rand seed 2; errors 0; firewood wanted 20 h of it (17.5 h before the hut was up)
+driftwood set down by the bench 1 times, taken up again 1, lying there at the end 0; Dot at the end fire, holding piece
+firsts: sighting 0.3h, clay-pit 14.1h, fibre 25.7h, raft 25.9h, mast 28.4h, hut 51.8h, south-load 52.2h, crossing:sopunu 52.2h, rope 95.9h, pier 105.7h, dry-wood 112.6h, lash 119.3h, sail 130.3h, rakko-bed 143.4h, fired-pot 178.4h, cook-pot 178.4h, hang 178.6h, oil 181h, lamp-dish 206h, rig 218.3h, house-roof 243.3h, house-walls 247.5h, house 249.6h, light 255.5h, retort 297h
+firewood lots at the end (kg; * reserved): green 188.6* 82.8; seasoned 199.9; trees felled 87
+ready in the lab at the end: —; Lantern fire
+at the end: pots green/dry/fired 1/0/3; firewood green 271.4 kg, seasoned 199.9 kg; runs m02x_air_barometer_test:running p15x_firewood_dry:running p12y_pot_dry:running p40x_oil_lamp:running
+the pier's foundation stones laid: 1 at 70.5 h, 2 at 82.8 h, 3 at 87.4 h, 4 at 88.8 h (pier done, 4 stones, 4 posts, 8 planks)
+the pier called done: 105.7 h, 4 stones, 4 posts, 8 planks — PASS (only with its four posts under it: science on #221, 11/7)
+the hut up, the longest time firewood was wanted with no step to get wood ready for Dot: 0.0 h — PASS
+the longest anyone stood still on its way to a task (under half a metre on, half-hourly): 0.0 h — PASS
+exit 0
