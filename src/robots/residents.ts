@@ -3241,7 +3241,7 @@ export function makeResidents(loc: any, T: any, fishNames: string[], birdNames: 
       tx = r.goal!.x; tz = r.goal!.z;
     }
     const dx0 = tx - r.pos.x, dz0 = tz - r.pos.z, d0 = Math.hypot(dx0, dz0);
-    if (d0 < 0.6) { r.path = undefined; r.went = 'arrived'; return true; }
+    if (d0 < 0.6) { r.path = undefined; r.went = 'arrived'; r.walk = 0; return true; }   // (there: its legs still — they had gone on as if walking where it stood; science on #221, 11/4)
     // on land, to somewhere on land: plan a way round what is in the way (again if the goal has moved off).
     // Round what is solid for its body, however short the walk: a short way that is clear goes straight; and no
     // way at all is no way (it does not set off straight at it instead).
@@ -3761,25 +3761,39 @@ export function makeResidents(loc: any, T: any, fishNames: string[], birdNames: 
     r.under = 0;
     // (a new task starts with a clean slate: how stuck it got on the last one is not counted against this one — a task its
     // mind chose did not reset it, and three in a row failed at once where the one before had stuck; life-run 2026-10-09)
-    if ((r.mo as any).forTask !== tk) { (r.mo as any).forTask = tk; r.blocked = 0; }
+    if ((r.mo as any).forTask !== tk) { (r.mo as any).forTask = tk; r.blocked = 0; (r.mo as any).taskFrom = { x: r.pos.x, z: r.pos.z, far: 0 }; }   // (and where it set out from: how far it has got from there)
     if (!tk.arrived) {
       r.act = r.wet ? 'swim' : r.holding ? 'carry' : 'walk';
-      const via = viaDoor(r, tk.x, tk.z) ?? viaPier(r, tk.x, tk.z), vk = via ? via.join() : '';   // (into or out of the house: by its doorway; onto or off the pier: by its landing)
+      // (into or out of the house: by its doorway; onto or off the pier: by its landing. A way point reached — as near to it
+      // as it could stand — is done with for this task: on straight to where it is going. Lantern, on the deck with a stone
+      // to hand out from the shore, had come as near the landing as something solid there let it, 1.7 m short, and was sent
+      // back to the landing every step, never taking one, from 88 h on; science on #221, 11/4)
+      const v0 = viaDoor(r, tk.x, tk.z) ?? viaPier(r, tk.x, tk.z), k0 = v0 ? v0.join() : '';
+      const via = v0 && !((tk as any).viaDone as string[] | undefined)?.includes(k0) ? v0 : null, vk = via ? k0 : '';
       if ((tk as any).via !== vk) { (tk as any).via = vk; r.path = undefined; }   // (a new leg: its way planned again)
-      tk.arrived = via ? (move(r, via[0], via[1], dt, !!tk.wet, fast), false) : move(r, tk.x, tk.z, dt, !!tk.wet, fast);
+      if (via) { if (move(r, via[0], via[1], dt, !!tk.wet, fast)) ((tk as any).viaDone ??= []).push(vk); tk.arrived = false; }
+      else tk.arrived = move(r, tk.x, tk.z, dt, !!tk.wet, fast);
+      const from = (r.mo as any).taskFrom as { x: number; z: number; far: number } | undefined;
+      if (from) from.far = Math.max(from.far, Math.hypot(r.pos.x - from.x, r.pos.z - from.z));
       if (tk.arrived && r.mo.backFrom) { walked(r, Math.hypot(r.pos.x - r.mo.backFrom[0], r.pos.z - r.mo.backFrom[1])); r.mo.backFrom = undefined; }   // (the way back from a gathering: to where it went next)
       tk.t += dt;
-      if (tk.t > 1800 / wearSlow(r) || r.blocked > 20) {   // (a slowed one is given the time its pace needs)
+      const late = tk.t > 1800 / wearSlow(r);   // (a slowed one is given the time its pace needs)
+      if (late || r.blocked > 20) {
+        // (out of time and not half a metre from where it set out: not slow but held up, and counted as held up — for the way
+        // out of a place it is wedged in, and among the places its tasks found no way to, set aside a while; a long walk that
+        // ran out of time is not. Science on #221, 11/4)
+        const stuck = late && (from?.far ?? 0) < 0.5, timedOut = late && !stuck;
+        const went = stuck ? 'blocked' : r.went;   // (held up, whatever its last way said — a way it had, and got no further on: not the "no way" of the task before)
         if (r.id === 'lantern' && tk.data?.studyId) study?.interrupt(tk.data.studyId, studyWorld(fast), '道を進めなかった。別の場所から確かめよう。', true);
-        if (r.went === 'no way' && !(tk.t > 1800 / wearSlow(r))) noteNoWay(r, tk.x, tk.z, true);
-        report(r, tk, tk.t > 1800 / wearSlow(r) ? 'timeout' : r.went === 'no way' || r.went === 'nowhere to stand' ? r.went : 'blocked', r.went === 'no way' ? '道がなかった' : r.went === 'nowhere to stand' ? '立てる場所がなかった' : '進めなかった');
+        if ((went === 'no way' && !late) || stuck) noteNoWay(r, tk.x, tk.z, true);
+        report(r, tk, timedOut ? 'timeout' : went === 'no way' || went === 'nowhere to stand' ? went : 'blocked', went === 'no way' ? '道がなかった' : went === 'nowhere to stand' ? '立てる場所がなかった' : '進めなかった');
         if (tk.data && typeof tk.data.id === 'number' && tk.data.kind) (tk.data.away ??= {})[r.id] = clockMs + 6 * 3.6e6;
         // (wedged where it could not get on: Lantern keeps the spot among the places it goes round, so the next way it plans
         // does not lead it back into the same trunks — it had been, again and again; life-run 2026-10-09)
         if (r.id === 'lantern' && r.went === 'blocked') { r.mo.bad.push([r.pos.x, r.pos.z]); if (r.mo.bad.length > 12) r.mo.bad.shift(); (r.mo as any).lastPlan = undefined; }
         // (wedged in the same place three times running — between trunks it cannot be pushed out from: it works itself free,
         // to the nearest clear footing within a few metres, rather than trying from there for days; life-run 2026-10-09)
-        if (!(tk.t > 1800 / wearSlow(r)) && r.went !== 'no way' && r.went !== 'nowhere to stand' && !r.wet) {   // (it gave up for being stuck — not for time, nor for no way)
+        if (!timedOut && went !== 'no way' && went !== 'nowhere to stand' && !r.wet) {   // (it gave up for being stuck — not for time, nor for no way)
           const w = (r.mo as any).wedged as { x: number; z: number; n: number } | undefined;
           const n = w && Math.hypot(w.x - r.pos.x, w.z - r.pos.z) < 1.5 ? w.n + 1 : 1; (r.mo as any).wedged = { x: r.pos.x, z: r.pos.z, n };
           if (n >= 3) {
@@ -4819,9 +4833,9 @@ export function makeResidents(loc: any, T: any, fishNames: string[], birdNames: 
   (res as any).sailHost = sail;     // (and the sail's)
   (res as any).cordDev = cordDev; (res as any).cordHost = cord; (res as any).sailDev = sailDev; (res as any).sailHost = sail;
   (res as any).tell = tell;   // (for checks: the world telling an event, and whether it is a first)
-  (res as any).talkDev = { startTalk, utter, sayables, optionsFor, requests, agentOf };
+  (res as any).talkDev = { startTalk, utter, sayables, optionsFor, requests, agentOf };   // (for checks: a conversation, a remark on its own — R-023 — and Rakko's offer of wood — R-026)
   (res as any).woodWanted = () => woodWanted();   // (for checks: whether the world wants firewood now, and why — read only)
-  (res as any).benchWoodDrawn = () => benchWoodG?.children.length ?? 0;   // (for checks: the driftwood logs drawn beside the bench)   // (for checks: a conversation, a remark on its own — R-023 — and Rakko's offer of wood — R-026)
+  (res as any).benchWoodDrawn = () => benchWoodG?.children.length ?? 0;   // (for checks: the driftwood logs drawn beside the bench)
   // wake up where they were, and catch up on the hours nobody was watching
   initStudyPlaces();
   const behind = load(Date.now());
