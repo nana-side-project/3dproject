@@ -9,6 +9,7 @@
 //  4 off the deck by its landing, something solid there (science on #221, 11/4 — the rand 2 island at 88 h: Lantern on the
 //    deck with a stone for the shore, the landing within a trunk's reach, was sent back to the landing every step and
 //    stood there for hours): Lantern gets from the deck to where it hands the stone out, and lays it, within a minute
+//  6 a plank only over a post: four planks and one post, none laid; the posts up, it is (science on #221, 11/7)
 //  5 not a step nearer in half an hour (its legs held still): given up as held up — 進めなかった, the place noted among
 //    those it found no way to, and set aside; three times so in one place, it works itself free of it; a slow walk that
 //    runs out of time is only that — 時間がかかりすぎた, nothing noted
@@ -125,6 +126,16 @@ const ring = (R: any, x: number, z: number, rad: number) => { for (let a = 0; a 
     const late = said(dot, '遠くを見る：時間がかかりすぎた'), w = R.noWayHost.at(dot, tx, tz);
     want('5 a slow walk that runs out of time: only that, nothing noted', late && !w?.n, `「遠くを見る：時間がかかりすぎた」 ${late}; ${Math.hypot(dot.pos.x - p0[0], dot.pos.z - p0[1]).toFixed(1)} m on in the half hour; noted ${w?.n ?? 0}`);
   }
+}
+{ // 6
+  // (a plank only over a post — science on #221, 11/7: four planks down and one post, Dot with a plank in hand lays none; at
+  // the bench it shapes a piece, not a plank; with the posts up it lays it)
+  sim = Date.parse('2026-12-04T13:00:00+09:00');
+  const { R, v, dot } = island(); v.bases = 4; v.posts = 1; v.deck = 4; R.pierHost.drawPier();
+  dot.task = null; run(R, 120);
+  const laid1 = v.deck;
+  v.posts = 4; R.pierHost.drawPier(); dot.holding = 'plank'; dot.task = null; run(R, 600);
+  want('6 four planks and one post: no fifth plank laid over nothing; with the posts up, it is', laid1 === 4 && v.deck >= 5, `with one post ${laid1} planks; with four, ${v.deck}`);
 }
 console.log(bad ? `\n${bad} FAILED` : '\nall ok');
 process.exit(bad ? 1 : 0);
