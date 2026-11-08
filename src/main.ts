@@ -2492,14 +2492,18 @@ function enterOcean(oc: Ocean, writeUrl = true) {
     oc.residents.onEvent = (k: string, text: string, r: any, meta?: { milestone?: string; trial?: any }) => { seaLog('robot', text, () => r.pos); liveUi?.event(k, text, r, meta); if (meta?.trial) rehearsal?.trial(r.id, meta.trial); };
     // their voices, when the camera is close enough to hear them
     oc.residents.onSay = (r: any, text: string) => {
-      const d = camera.position.distanceTo(r.pos); if (d > (live ? 120 : 40)) return;
+      const d = camera.position.distanceTo(r.pos);
+      // (live: one on the screen — in front of the camera, within its frame — is heard as loud however far; one off it, by
+      // its distance as ever, and not past 40 m: a voice with no bubble and no caption is no one's; viewer design on #249)
+      const v = live ? _w.copy(r.pos).project(camera) : null, seen = !!v && Math.abs(v.x) < 1 && Math.abs(v.y) < 1 && v.z < 1, sx = v ? v.x : 0;   // (read now: _w is used again below)
+      if (d > (seen ? 120 : 40)) return;
       _w.subVectors(r.pos, camera.position).normalize();
       const right = new THREE.Vector3(Math.cos(drone.yaw), 0, -Math.sin(drone.yaw));
       // (a line in the island's words: said in its own voice; anything else: the old babble)
       let loud = Math.min(1, 1.3 / (1 + d * 0.12)) * (overSea(camera.position) > 0 || overSea(r.pos) < 0 ? 1 : 0.4), pan = _w.dot(right);
       // (the live screen: a voice as loud however far the camera is — a fixed camera's wide shot too, as the bubbles keep
       // their size — and to the side the speaker is on the screen; TRIAL6.md §2)
-      if (live) { loud = 0.8; const v = _w.copy(r.pos).project(camera); pan = Math.max(-0.8, Math.min(0.8, v.x)); }
+      if (seen) { loud = 0.8; pan = Math.max(-0.8, Math.min(0.8, sx)); }
       if (r.sayIsl) lumauVoice(r.id, r.sayIsl, loud, pan); else babble(r.id, text, loud, pan);
       if (!guideEl.hidden && (panelTab === 'talk' || panelTab === 'island')) renderGuide();
     };
