@@ -727,6 +727,12 @@ export function makeResidents(loc: any, T: any, fishNames: string[], birdNames: 
     if (village.pier === 'build') pierGhost.children.forEach((g, i) => (g.visible = i < 4 ? i >= village.bases : i < 8 ? i - 4 >= village.posts : i - 8 >= village.deck));
   }
   const pileStand = (i: number, wet: boolean): [number, number] => { const [x, z] = along(PILE_T[i]); return wet ? [x + pierAt.dz * 0.8, z - pierAt.dx * 0.8] : [x - pierAt.dx * 1.2, z - pierAt.dz * 1.2]; };
+  // (a plank is laid only over a post: its far end, along(1.2·(k+1)), no further out than the last post standing, give or
+  // take its overhang — a deck with nothing under it is no deck; science on #221, 11/7)
+  const plankHeld = (k = village.deck) => village.posts > 0 && k < 8 && PILE_T[village.posts - 1] + 0.3 >= 1.2 * (k + 1);
+  // (an island whose pier was called done with posts or stones short — before that rule: its work goes on until they are in)
+  const pierShort = () => village.pier === 'done' && (village.bases < 4 || village.posts < 4);
+  const pierWork = () => village.pier === 'build' || pierShort();
   const plankStand = (k: number): [number, number] => along(Math.max(-0.6, 0.6 + k * 1.2 - 1.2));   // (on the last plank laid)
   // (where the pier meets ground one walks on: the first point back from its root a little clear of the water's edge — on a
   // low shore, the strip between is trodden as a path to it)
@@ -1714,10 +1720,10 @@ export function makeResidents(loc: any, T: any, fishNames: string[], birdNames: 
     }
     // the pier, once they have agreed on it
     if (village.pier === 'plan' && r.id === 'kame') return task('survey', along(1), 'look', rr(60, 120));
-    if (village.pier === 'build') {
+    if (pierWork()) {
       if (r.id === 'lantern' && r.holding === 'stone' && village.bases < 4 && !setAside(r, ...along(-0.8))) return task('base', along(-0.8), 'work', 6);   // (from the shore it hands the stone out)
       if (r.id === 'rakko' && r.holding === 'wood' && village.posts < village.bases && !setAside(r, ...pileStand(village.posts, true))) return task('post', pileStand(village.posts, true), 'work', 8, { wet: true });
-      if (r.id === 'dot' && r.holding === 'plank' && !setAside(r, ...plankStand(village.deck))) return task('deck', plankStand(village.deck), 'hammer', 8);
+      if (r.id === 'dot' && r.holding === 'plank' && plankHeld() && !setAside(r, ...plankStand(village.deck))) return task('deck', plankStand(village.deck), 'hammer', 8);
       if (r.id === 'rakko' && !r.holding && village.posts < village.bases && q < 0.3) {
         const it = items.nearest('wood', r.pos.x, r.pos.z, 260, r.id, clockMs);
         if (it) { items.claim(it, r.id); return task('gather', [it.x, it.z], 'pick', 3.5, { data: it }); }
@@ -1727,7 +1733,7 @@ export function makeResidents(loc: any, T: any, fishNames: string[], birdNames: 
         if (it) { items.claim(it, r.id); return task('fetch', [it.x, it.z], 'work', 3, { data: it }); }
       }
       if (r.id === 'kame' && q < 0.2) return task('inspect', along(4), 'look', rr(120, 300));   // keeping an eye on the work, and the tide
-      if (r.id === 'dot' && !r.holding && village.posts >= 4 && village.deck < 8 && (r.stats.built >= HUT.length || q < 0.15) && q < 0.3) {
+      if (r.id === 'dot' && !r.holding && village.posts >= 4 && village.deck < 8 && plankHeld() && (r.stats.built >= HUT.length || q < 0.15) && q < 0.3) {
         const it = items.nearest('wood', r.pos.x, r.pos.z, 220, r.id, clockMs);
         if (it) { items.claim(it, r.id); return task('gather', [it.x, it.z], 'pick', 3.5, { data: it }); }
       }
@@ -1909,7 +1915,7 @@ export function makeResidents(loc: any, T: any, fishNames: string[], birdNames: 
       if (!r.holding && awake(dot)) for (const it of items.list) if (it.kind === 'wood' && known(`wood#${it.id}`) && !it.by) o.push({ id: `tell:dot:wood#${it.id}`, action: 'tell', label: `ドットに流木の場所を教える`, targetId: `wood#${it.id}` });
       o.push({ id: 'pile:beach', action: 'pile', label: '貝殻を浜の山に並べる', ...(r.holding === 'shell' ? {} : { ready: false, needs: '貝殻を持っていること' }) });
       // (no 'show it to someone': a shell is not shown off — ADR 0004, addendum 2026-10-04)
-      if (village.pier === 'build' && village.posts < village.bases) o.push({ id: 'post:pier', action: 'post', label: '桟橋の柱を立てる', ...(r.holding === 'wood' ? {} : { ready: false, needs: '流木を持っていること' }) });
+      if (pierWork() && village.posts < village.bases) o.push({ id: 'post:pier', action: 'post', label: '桟橋の柱を立てる', ...(r.holding === 'wood' ? {} : { ready: false, needs: '流木を持っていること' }) });
       if (nestWanted() || ledgeWanted() || wallWanted()) o.push({ id: 'seastone:sea', action: 'seastone', label: nestWanted() ? `休み場の囲いにするサンゴ石を海の底から拾う（${village.nest.n}/${NEST_N}。荒れた日に波の静かな所ができる）` : ledgeWanted() ? `カメマルの岩棚のまわりに置くサンゴ石を海の底から拾う（${village.ledge.n}/${LEDGE_N}。うねりが岩棚に入りにくくなる）` : `ドットの家の石垣にするサンゴ石を海の底から拾う（石垣${village.wall.n}/${WALL_N}、浜に${village.wall.pile}個）`, ...(r.holding ? { ready: false, needs: '手があいていること' } : {}) });
       if (ledgeWanted()) o.push({ id: 'ledge:sea', action: 'ledge', label: `石をカメマルの岩棚のまわりに置く（${village.ledge.n + 1}/${LEDGE_N}）`, ...(r.holding === 'stone' ? {} : { ready: false, needs: '石を持っていること' }) });
       if (nestWanted()) o.push({ id: 'nest:sea', action: 'nest', label: `石を休み場の囲いに積む（${village.nest.n + 1}/${NEST_N}）`, ...(r.holding === 'stone' ? {} : { ready: false, needs: '石を持っていること' }) });
@@ -2052,7 +2058,7 @@ export function makeResidents(loc: any, T: any, fishNames: string[], birdNames: 
     else if (action === 'collect') { const n = +target.split('#')[1], it = items.list.find((x) => x.id === n && x.kind === 'shell'); if (!it || (it.by && it.by !== r.id)) return null; items.claim(it, r.id); t = task('collect', [it.x, it.z], 'pick', 3, { data: it }); }
     else if (action === 'pile') t = r.holding === 'shell' ? task('pile', pileAt(r.stats.shells) as [number, number], 'pick', 3) : null;
     else if (action === 'show') { const f = byId[target]; t = f && r.holding === 'shell' ? task('show', [f.pos.x, f.pos.z], 'look', 5.5, { data: f.id }) : null; if (t) { showCool = 120; shownTo[f.id] = clockMs + rr(3, 8) * 60e3; } }
-    else if (action === 'post') t = r.holding === 'wood' && village.pier === 'build' && village.posts < village.bases ? task('post', pileStand(village.posts, true), 'work', 8, { wet: true }) : null;
+    else if (action === 'post') t = r.holding === 'wood' && pierWork() && village.posts < village.bases ? task('post', pileStand(village.posts, true), 'work', 8, { wet: true }) : null;
     else if (action === 'float') t = task('float', spot(home, 60, (x, z, h) => h < -0.8 && h > -4), 'float', rr(300, 600), { wet: true });
     else if (action === 'groom') t = task('groom', spot(home, 50, (x, z, h) => h < -0.8 && h > -4), 'groom', rr(90, 200), { wet: true });
     else if (action === 'soak' || action === 'takeout') { const p = husk.sites().pool; t = task(action === 'soak' ? 'husk-soak' : 'husk-takeout', p.stand ?? [p.x, p.z], 'pick', 4); }   // (on the dry spot by the pool, reaching in)
@@ -2839,7 +2845,7 @@ export function makeResidents(loc: any, T: any, fishNames: string[], birdNames: 
       }
       case 'craft':
         r.stats.wood = 0;
-        if (r.stats.built >= HUT.length && village.pier === 'build') { r.holding = 'plank'; r.task = null; return; }   // (a plank for the pier)
+        if (r.stats.built >= HUT.length && village.pier === 'build' && plankHeld()) { r.holding = 'plank'; r.task = null; return; }   // (a plank for the pier)
         r.holding = 'piece'; r.task = r.stats.built < HUT.length && !agentOf(r) ? task('place', slotStand(r.stats.built), 'hammer', 7) : null; return;
       case 'place': {
         const k = r.stats.built; if (k >= HUT.length) { r.holding = ''; break; }
@@ -2994,8 +3000,8 @@ export function makeResidents(loc: any, T: any, fishNames: string[], birdNames: 
       case 'base': if (r.holding !== 'stone' || village.bases >= 4) break; r.holding = ''; launch(r, bases[village.bases], fast); village.bases++; drawPierSoon(); note(r, 'base', {}, '桟橋の土台石を据えた'); break;
       case 'post': if (r.holding !== 'wood' || village.posts >= village.bases) break; r.holding = ''; launch(r, posts[village.posts], fast); village.posts++; drawPierSoon(); note(r, 'post', {}, '桟橋の柱を立てた'); break;
       case 'deck':
-        if (r.holding !== 'plank' || village.deck >= 8) break; r.holding = ''; launch(r, planks[village.deck], fast); village.deck++; drawPierSoon();
-        if (village.deck >= 8) { village.pier = 'done'; for (const o of list) note(o, 'pierDone', {}, '桟橋が完成した（共同作業）'); tell('pier', '桟橋が完成した。みんなでつくった、はじめての大きなもの', r); }
+        if (r.holding !== 'plank' || village.deck >= 8 || !plankHeld()) break; r.holding = ''; launch(r, planks[village.deck], fast); village.deck++; drawPierSoon();
+        if (village.deck >= 8 && village.posts >= 4 && village.bases >= 4) { village.pier = 'done'; for (const o of list) note(o, 'pierDone', {}, '桟橋が完成した（共同作業）'); tell('pier', '桟橋が完成した。みんなでつくった、はじめての大きなもの', r); }
         else note(r, 'deck', {}, '桟橋の板を張った');
         break;
       case 'find':
@@ -3790,7 +3796,7 @@ export function makeResidents(loc: any, T: any, fishNames: string[], birdNames: 
         if (tk.data && typeof tk.data.id === 'number' && tk.data.kind) (tk.data.away ??= {})[r.id] = clockMs + 6 * 3.6e6;
         // (wedged where it could not get on: Lantern keeps the spot among the places it goes round, so the next way it plans
         // does not lead it back into the same trunks — it had been, again and again; life-run 2026-10-09)
-        if (r.id === 'lantern' && r.went === 'blocked') { r.mo.bad.push([r.pos.x, r.pos.z]); if (r.mo.bad.length > 12) r.mo.bad.shift(); (r.mo as any).lastPlan = undefined; }
+        if (r.id === 'lantern' && went === 'blocked') { r.mo.bad.push([r.pos.x, r.pos.z]); if (r.mo.bad.length > 12) r.mo.bad.shift(); (r.mo as any).lastPlan = undefined; }
         // (wedged in the same place three times running — between trunks it cannot be pushed out from: it works itself free,
         // to the nearest clear footing within a few metres, rather than trying from there for days; life-run 2026-10-09)
         if (!timedOut && went !== 'no way' && went !== 'nowhere to stand' && !r.wet) {   // (it gave up for being stuck — not for time, nor for no way)

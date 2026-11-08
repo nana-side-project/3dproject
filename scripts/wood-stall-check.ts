@@ -40,6 +40,7 @@ let errors = 0, since = -1, worst = { len: 0, from: 0, why: '', holding: '' }, w
 const STILL_H = 3, onWay: Record<string, { x: number; z: number; n: number; from: number } | undefined> = {};
 let still = { len: 0, who: '', from: 0, kind: '', x: 0, z: 0 }, lastBases = R.village.bases ?? 0;
 const basesAt: string[] = [];
+let doneWith = '';   // (the pier's posts and stones when it was called done)
 const hutN: number = R.places().hutN;
 const GETS = /^(fuel|fell|woodtake):/;
 // (PROBE_AT=h,h,…: at those hours, the pots, the firewood lots and what the lab has ready — to see why a fire waits)
@@ -53,6 +54,7 @@ for (let s = 0; s < HOURS * 3600; s++) {
   for (const r of R.list) if (!r.sp.living) r.battery = Math.max(r.battery, 0.3);
   if (s % 7200 === 0) for (const b of R.beds ?? []) regrowBed(b, now);
   { const b = R.village.benchWood ?? 0; if (b > lastBench) ups += b - lastBench; else if (b < lastBench) downs += lastBench - b; lastBench = b; }
+  if (!doneWith && R.village.pier === 'done') doneWith = `${hrs(now)} h, ${R.village.bases} stones, ${R.village.posts} posts, ${R.village.deck} planks`;
   if ((R.village.bases ?? 0) !== lastBases) { lastBases = R.village.bases ?? 0; basesAt.push(`${lastBases} at ${hrs(now)} h`); }
   if (probeAt.length && s % 3600 === 0 && probeAt.includes(s / 3600)) probe(s / 3600);
   if (s % 1800 === 0) {
@@ -81,7 +83,8 @@ console.log(`firewood lots at the end (kg; * reserved): green ${lots((l) => !dry
 console.log(`ready in the lab at the end: ${(R.labReady?.() ?? []).join(' ') || '—'}; Lantern ${(() => { const ln = R.list.find((r: any) => r.id === 'lantern'); return `${ln.task?.kind ?? ln.act}`; })()}`);
 console.log(`at the end: pots green/dry/fired ${['green_pot', 'dry_pot', 'fired_pot'].map((m) => L.filter((l) => l.materialId === m).length).join('/')}; firewood green ${kg((l) => fw(l) && !dry(l))} kg, seasoned ${kg((l) => fw(l) && dry(l))} kg; runs ${V.labRuns.map((x: any) => `${x.processId}:${R.lab.runs[x.runId]?.status}`).join(' ') || '—'}`);
 console.log(`the pier's foundation stones laid: ${basesAt.join(', ') || 'none'} (pier ${V.pier ?? '-'}, ${V.bases ?? 0} stones, ${V.posts ?? 0} posts, ${V.deck ?? 0} planks)`);
-const woodOk = worst.len < STALL_H && errors === 0, stillOk = still.len < STILL_H, ok = woodOk && stillOk;
+const woodOk = worst.len < STALL_H && errors === 0, stillOk = still.len < STILL_H, pierOk = !doneWith || / 4 stones, 4 posts, 8 planks/.test(doneWith), ok = woodOk && stillOk && pierOk;
+console.log(`the pier called done: ${doneWith || 'not yet'} — ${pierOk ? 'PASS' : 'FAIL'} (only with its four posts under it: science on #221, 11/7)`);
 console.log(`the hut up, the longest time firewood was wanted with no step to get wood ready for Dot: ${worst.len.toFixed(1)} h${worst.len ? ` (from ${worst.from} h, ${worst.why}, holding ${worst.holding})` : ''} — ${woodOk ? 'PASS' : 'FAIL'}`);
 console.log(`the longest anyone stood still on its way to a task (under half a metre on, half-hourly): ${still.len.toFixed(1)} h${still.len ? ` (${still.who}, from ${still.from} h, ${still.kind}, at (${still.x.toFixed(1)}, ${still.z.toFixed(1)}))` : ''} — ${stillOk ? 'PASS' : 'FAIL'}`);
 process.exit(ok ? 0 : 1);
