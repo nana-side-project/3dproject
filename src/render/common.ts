@@ -261,13 +261,15 @@ vec3 skyAir(vec3 d, float disks){
   float cloudy = 1.0 - 0.75 * uCloud;
   // the Milky Way and a faint airglow, only in real darkness and away from the moon
   float dark = (1.0 - smoothstep(-0.3, -0.12, sy)) * (1.0 - 0.75 * uMoonI) * cloudy;
+  vec3 far = vec3(0.0);   // (the light from beyond the air: hidden behind the moon's disc)
   if (dark > 0.0) {
     vec3 q = transpose(uStarM) * d;
     // the map runs east to the left with RA 0h in the middle, as the sky is seen from inside
     vec2 uv = vec2(fract(0.5 - atan(q.y, q.x) / 6.28318), 0.5 + asin(clamp(q.z, -1.0, 1.0)) / 3.14159);
     vec3 mw = pow(textureLod(uMilky, uv, 0.0).rgb, vec3(1.25));   // no mip lookup: atan jumps at RA 0h
-    c += mw * vec3(0.95, 0.9, 1.05) * 0.42 * dark * smoothstep(-0.02, 0.2, d.y);   // dimmed low down by the thicker air
-    c += vec3(0.04, 0.05, 0.06) * dark * exp(-h * 6.0);   // airglow, brightest in a band low over the horizon
+    far += mw * vec3(0.95, 0.9, 1.05) * 0.42 * dark * smoothstep(-0.02, 0.2, d.y);   // dimmed low down by the thicker air
+    far += vec3(0.04, 0.05, 0.06) * dark * exp(-h * 6.0);   // airglow, brightest in a band low over the horizon (the high air, behind the moon too)
+    c += far;
   }
   // aurora: curtains toward the magnetic pole, green below and red-violet at the top
   if (uAurora > 0.0) {
@@ -292,7 +294,9 @@ vec3 skyAir(vec3 d, float disks){
       float lit = smoothstep(-0.05, 0.12, dot(n, uAirSun));
       float mare = 0.72 + 0.28 * smoothstep(0.35, 0.6, vn2(mp * 2.3 + 5.0) * 0.6 + vn2(mp * 5.0) * 0.4);
       vec3 mc = vec3(1.0, 0.97, 0.9) * mare * (lit * 2.4 + 0.035) * smoothstep(1.0, 0.9, mr);
-      c = mix(c, c * 0.3 + mc, smoothstep(1.0, 0.92, mr) * smoothstep(-0.02, 0.02, w.y));
+      // (the disc hides what lies beyond the air — the Milky Way, the airglow; the sky's blue and the twilight glow are
+      // the air in front of it and stay, so the moon's dark side is never darker than the sky about it)
+      c = mix(c, c - far + mc, smoothstep(1.0, 0.92, mr) * smoothstep(-0.02, 0.02, w.y));
     }
     c += vec3(0.55, 0.62, 0.78) * pow(max(dot(d, w), 0.0), 900.0) * 0.5 * uMoonIllum * (1.0 - day) * smoothstep(-0.02, 0.02, w.y);
   }
